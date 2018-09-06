@@ -97,7 +97,13 @@ void processSendBuffer() {
 #endif
 
 #ifdef HAS_SPI
+#  ifdef HAS_SPI_SLAVE
+  spi_slave_process();
+#  endif
   if (xQueueReceive(SPISendQueue, &SendBuffer, (TickType_t)0) == pdTRUE) {
+#  ifdef HAS_SPI_SLAVE
+    spi_slave_send( &SendBuffer );
+#  endif
     ESP_LOGI(TAG, "%d bytes sent to SPI", SendBuffer.MessageSize);
   }
 #endif

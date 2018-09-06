@@ -138,9 +138,13 @@ void setup() {
   if (SPISendQueue == 0) {
     ESP_LOGE(TAG, "Could not create SPI send queue. Aborting.");
     exit(0);
-  } else
+  } else {
     ESP_LOGI(TAG, "SPI send queue created, size %d Bytes",
              SEND_QUEUE_SIZE * PAYLOAD_BUFFER_SIZE);
+#  ifdef HAS_SPI_SLAVE
+    spi_slave_init();
+#  endif
+  }
 #endif
 
     // initialize led

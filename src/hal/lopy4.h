@@ -1,4 +1,4 @@
-// Hardware related definitions for Pycom LoPy Board (not: LoPy4)
+// Hardware related definitions for Pycom LoPy4 Board
 
 #define HAS_LORA 1       // comment out if device shall not send data via LoRa
 #define HAS_SPI 1        // comment out if device shall not send data via SPI
@@ -6,6 +6,14 @@
 #define HAS_LED NOT_A_PIN // LoPy4 has no on board LED, so we use RGB LED on LoPy4
 #define HAS_RGB_LED   GPIO_NUM_0  // WS2812B RGB LED on GPIO0
 #define BOARD_HAS_PSRAM // use extra 4MB extern RAM
+
+// Hardware pins for SPI SLAVE
+#define HAS_SPI_SLAVE 1
+#define PIN_SPI_SLAVE_SS    GPIO_NUM_36
+#define PIN_SPI_SLAVE_MOSI  GPIO_NUM_22
+#define PIN_SPI_SLAVE_MISO  GPIO_NUM_12
+#define PIN_SPI_SLAVE_SCK   GPIO_NUM_13
+#define PIN_SPI_SLAVE_IRQ   GPIO_NUM_2      // informs Master about new data
 
 // Hardware pin definitions for Pycom LoPy4 board
 #define PIN_SPI_SS    GPIO_NUM_18

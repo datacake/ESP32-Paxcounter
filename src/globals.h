@@ -70,6 +70,10 @@ extern std::array<uint64_t, 0xff> beacons;
 #include "lorawan.h"
 #endif
 
+#if defined(HAS_SPI) && defined(HAS_SPI_SLAVE)
+#include "spi_slave.h"
+#endif
+
 #ifdef HAS_DISPLAY
 #include "display.h"
 #endif
