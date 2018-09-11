@@ -57,9 +57,9 @@ void wifi_channel_loop(void *pvParameters) {
       channel = (channel % WIFI_CHANNEL_MAX) + 1;
       esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
       ESP_LOGD(TAG, "Wifi set channel %d", channel);
-
-      vTaskDelay(1 / portTICK_PERIOD_MS); // reset watchdog
     }
+
+    vTaskDelay(1 / portTICK_PERIOD_MS); // reset watchdog
 
   } // end of infinite wifi channel rotation loop
 }
