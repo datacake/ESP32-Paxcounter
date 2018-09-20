@@ -97,14 +97,38 @@ void processSendBuffer() {
 #endif
 
 #ifdef HAS_SPI
-#  ifdef HAS_SPI_SLAVE
+#  if HAS_SPI_SLAVE
   spi_slave_process();
 #  endif
   if (xQueueReceive(SPISendQueue, &SendBuffer, (TickType_t)0) == pdTRUE) {
-#  ifdef HAS_SPI_SLAVE
+#  if HAS_SPI_SLAVE
     spi_slave_send( &SendBuffer );
 #  endif
     ESP_LOGI(TAG, "%d bytes sent to SPI", SendBuffer.MessageSize);
+
+    int uptime_ms = esp_timer_get_time() / 1000;
+    char tbuf[14];
+    printf("------------------------------------------------------------------\n");
+    printf("Total WiFi: %hu, BL: %hu, uptime: %.02hu:%.02hu:%.02hu, ram: %u bytes\n",
+      macs_wifi, macs_ble,
+      (uptime_ms / 3600000),
+      (uptime_ms / 60000) % 60,
+      (uptime_ms / 1000) % 60,
+      ESP.getFreeHeap());
+    printf("------------------------------------------------------------------\n");
+    printf("MAC          | CH | RSSI | LAST [sec] | COUNT  \n");
+
+    for( auto iter = macs.begin(); iter != macs.end(); iter++ )
+    {
+      FoundDevice* dev = &*iter;
+
+      printf( "%012llX | %.2i | %.2i  | %10lu | %i\n",
+          dev->mac,
+          dev->last_channel,
+          dev->last_rssi,
+          (uptime_ms - dev->last_timestamp) / 1000,
+          dev->seen_count);
+    }
   }
 #endif
 

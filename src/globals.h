@@ -9,7 +9,7 @@
 #define PROGNAME "PAXCNT"
 
 // std::set for unified array functions
-#include <set>
+#include <list>
 #include <array>
 #include <algorithm>
 
@@ -41,12 +41,35 @@ typedef struct {
   uint8_t Message[PAYLOAD_BUFFER_SIZE];
 } MessageBuffer_t;
 
+struct FoundDevice {
+  uint64_t mac;
+  int8_t last_rssi;
+  uint8_t last_channel;
+  time_t last_timestamp;
+  uint32_t seen_count;
+};
+
+inline bool operator<(const FoundDevice& lhs, const FoundDevice& rhs)
+{
+  return lhs.last_timestamp > rhs.last_timestamp;
+}
+
+struct FoundDeviceByMac {
+  uint64_t mac_to_find;
+
+  FoundDeviceByMac( uint64_t _mac_to_find ) : mac_to_find( _mac_to_find ) {}
+
+  bool operator()(const FoundDevice& dev) const {
+    return dev.mac == mac_to_find;
+  }
+};
+
 // global variables
 extern configData_t cfg;                      // current device configuration
 extern char display_line6[], display_line7[]; // screen buffers
 extern uint8_t channel;                       // wifi channel rotation counter
 extern uint16_t macs_total, macs_wifi, macs_ble, batt_voltage; // display values
-extern std::set<uint16_t> macs; // temp storage for MACs
+extern std::list<FoundDevice> macs; // temp storage for MACs
 extern hw_timer_t *channelSwitch, *sendCycle;
 extern portMUX_TYPE timerMux;
 extern volatile int SendCycleTimerIRQ, HomeCycleIRQ, DisplayTimerIRQ,

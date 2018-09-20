@@ -37,12 +37,12 @@ void printKey(const char *name, const uint8_t *key, uint8_t len, bool lsb) {
 }
 
 uint64_t macConvert(uint8_t *paddr) {
-  return ((uint64_t)paddr[0]) | ((uint64_t)paddr[1] << 8) |
-         ((uint64_t)paddr[2] << 16) | ((uint64_t)paddr[3] << 24) |
-         ((uint64_t)paddr[4] << 32) | ((uint64_t)paddr[5] << 40);
+  return ((uint64_t)paddr[5]) | ((uint64_t)paddr[4] << 8) |
+         ((uint64_t)paddr[3] << 16) | ((uint64_t)paddr[2] << 24) |
+         ((uint64_t)paddr[1] << 32) | ((uint64_t)paddr[0] << 40);
 }
 
-bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type) {
+bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
 
   char buff[16]; // temporary buffer for printf
   bool added = false;
@@ -52,6 +52,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type) {
 #ifdef VENDORFILTER
   uint32_t vendor2int; // temporary buffer for Vendor OUI
 #endif
+
+  const uint64_t mac = macConvert( paddr );
 
   // only last 3 MAC Address bytes are used for MAC address anonymization
   // but since it's uint32 we take 4 bytes to avoid 1st value to be 0
@@ -75,9 +77,43 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type) {
                                          // 8 digit hex string
     hashedmac = rokkit(&buff[3], 5); // hash MAC last string value, use 5 chars
                                      // to fit hash in uint16_t container
-    auto newmac = macs.insert(hashedmac); // add hashed MAC, if new unique
-    added = newmac.second ? true
-                          : false; // true if hashed MAC is unique in container
+
+    auto iter = std::find_if( macs.begin(), macs.end(), FoundDeviceByMac( mac ));
+    FoundDevice* dev = nullptr;
+
+    // do we know this mac yet?
+    if( iter == macs.end() )
+    {
+      // new device
+
+      FoundDevice f;
+      f.mac = mac;
+      f.seen_count = 0;
+
+      auto newmac = macs.insert( macs.end(), f); // add hashed MAC, if new unique
+
+      dev = &(*newmac);
+
+      added = true;
+    }
+    else
+    {
+      // known device
+      dev = &*iter;
+    }
+
+    if(dev == nullptr)
+    {
+      ESP_LOGE( TAG, "dev==nullptr");
+      return false;
+    }
+
+    int uptime_ms = esp_timer_get_time() / 1000;
+
+    dev->last_rssi = rssi;
+    dev->last_channel = channel;
+    dev->last_timestamp = uptime_ms;
+    dev->seen_count++;
 
     // Count only if MAC was not yet seen
     if (added) {
@@ -111,7 +147,6 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type) {
           SendData(BEACONPORT);
         }
       };
-
     } // added
 
     // Log scan result

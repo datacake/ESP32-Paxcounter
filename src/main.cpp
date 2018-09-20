@@ -54,7 +54,7 @@ portMUX_TYPE timerMux =
     portMUX_INITIALIZER_UNLOCKED; // sync main loop and ISR when modifying IRQ
                                   // handler shared variables
 
-std::set<uint16_t> macs; // container holding unique MAC adress hashes
+std::list<FoundDevice> macs; // container holding unique MAC adress hashes
 
 // initialize payload encoder
 PayloadConvert payload(PAYLOAD_BUFFER_SIZE);
@@ -141,7 +141,7 @@ void setup() {
   } else {
     ESP_LOGI(TAG, "SPI send queue created, size %d Bytes",
              SEND_QUEUE_SIZE * PAYLOAD_BUFFER_SIZE);
-#  ifdef HAS_SPI_SLAVE
+#  if HAS_SPI_SLAVE
     spi_slave_init();
 #  endif
   }

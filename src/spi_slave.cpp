@@ -134,6 +134,6 @@ void spi_slave_send( MessageBuffer_t* message )
 
     if( ret != ESP_OK )
     {
-        ESP_LOGW( "SPIS", "SPI Slave device queue was not empty", ret );
+        ESP_LOGI( "SPIS", "SPI Slave device queue was not empty", ret );
     }
 }

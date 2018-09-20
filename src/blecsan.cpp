@@ -167,7 +167,7 @@ IRAM_ATTR void gap_callback_handler(esp_gap_ble_cb_event_t event,
 #endif
 
       // add this device and show new count total if it was not previously added
-      mac_add((uint8_t *)p->scan_rst.bda, p->scan_rst.rssi, MAC_SNIFF_BLE);
+      mac_add((uint8_t *)p->scan_rst.bda, p->scan_rst.rssi, MAC_SNIFF_BLE, 0);
 
       /* to be improved in vendorfilter if:
       

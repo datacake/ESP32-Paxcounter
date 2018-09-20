@@ -22,7 +22,7 @@ IRAM_ATTR void wifi_sniffer_packet_handler(void *buff,
     ESP_LOGD(TAG, "WiFi RSSI %d -> ignoring (limit: %d)", ppkt->rx_ctrl.rssi,
              cfg.rssilimit);
   else // count seen MAC
-    mac_add((uint8_t *)hdr->addr2, ppkt->rx_ctrl.rssi, MAC_SNIFF_WIFI);
+    mac_add((uint8_t *)hdr->addr2, ppkt->rx_ctrl.rssi, MAC_SNIFF_WIFI, ppkt->rx_ctrl.channel );
 }
 
 void wifi_sniffer_init(void) {
