@@ -324,6 +324,11 @@ Note: all settings are stored in NVRAM and will be reloaded when device starts. 
 	byte 1 = beacon ID (0..255)
 	bytes 2..7 = beacon MAC with 6 digits (e.g. MAC 80:ab:00:01:02:03 -> 0x80ab00010203)
 
+0x40 set wifi channel scanning range
+
+	byte 1 = start-channel
+	byte 2 = number of channels to scan (start to start + number)
+
 0x80 get device configuration
 
 	Device answers with it's current configuration on Port 3. 

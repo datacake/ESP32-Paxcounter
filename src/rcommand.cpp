@@ -1,6 +1,7 @@
 // Basic Config
 #include "globals.h"
 #include "rcommand.h"
+#include "wifiscan.h"
 
 // Local logging tag
 static const char TAG[] = "main";
@@ -64,7 +65,7 @@ void set_blescantime(uint8_t val[]) {
   cfg.blescantime = val[0];
   ESP_LOGI(TAG, "Remote command: set BLE scan time to %.1f seconds",
            cfg.blescantime / float(100));
-#ifdef BLECOUNTER
+#if BLECOUNTER
   // stop & restart BLE scan task to apply new parameter
   if (cfg.blescan) {
     stop_BLEscan();
@@ -147,11 +148,13 @@ void set_loraadr(uint8_t val[]) {
 void set_blescan(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: set BLE scanner to %s", val[0] ? "on" : "off");
   cfg.blescan = val[0] ? 1 : 0;
-#ifdef BLECOUNTER
+#if BLECOUNTER
   if (cfg.blescan)
     start_BLEscan();
   else {
+    #if DEVICE_ROLE == ROLE_STANDALONE
     macs_ble = 0; // clear BLE counter
+    #endif
     stop_BLEscan();
   }
 #endif
@@ -186,6 +189,25 @@ void set_lorapower(uint8_t val[]) {
   ESP_LOGW(TAG, "Remote command: LoRa not implemented");
 #endif // HAS_LORA
 };
+
+void set_wifichans( uint8_t val[] )
+{
+  if( (val[0] >= WIFI_CHANNEL_MIN) && 
+      (val[0] < (WIFI_CHANNEL_MIN + WIFI_CHANNEL_MAX)) )
+  {
+    cfg.wifi.schan = val[0];
+  }
+
+  if( (val[0] + val[1]) <= ( WIFI_CHANNEL_MIN + WIFI_CHANNEL_MAX) )
+  {
+    cfg.wifi.nchan = val[1];
+  }
+
+  ESP_LOGI(TAG,
+    "Remote command: set Wifi scan range from channel %d to channel %d",
+    cfg.wifi.schan,
+    cfg.wifi.nchan + cfg.wifi.schan - 1);
+}
 
 void get_config(uint8_t val[]) {
   ESP_LOGI(TAG, "Remote command: get device configuration");
@@ -224,6 +246,7 @@ void get_gps(uint8_t val[]) {
 // flag (1 = do make settings persistent / 0 = don't)
 //
 cmd_t table[] = {
+    // set commands
     {0x01, set_rssi, 1, true},          {0x02, set_countmode, 1, true},
     {0x03, set_gps, 1, true},           {0x04, set_display, 1, true},
     {0x05, set_lorasf, 1, true},        {0x06, set_lorapower, 1, true},
@@ -233,6 +256,8 @@ cmd_t table[] = {
     {0x0d, set_vendorfilter, 1, false}, {0x0e, set_blescan, 1, true},
     {0x0f, set_wifiant, 1, true},       {0x10, set_rgblum, 1, true},
     {0x11, set_monitor, 1, true},       {0x12, set_beacon, 7, false},
+    {0x40, set_wifichans, 2, true},
+    // get commands
     {0x80, get_config, 0, false},       {0x81, get_status, 0, false},
     {0x84, get_gps, 0, false}};
 

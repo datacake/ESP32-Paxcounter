@@ -78,7 +78,7 @@ void init_display(const char *Productname, const char *Version) {
   u8x8.clear();
   u8x8.setPowerSave(!cfg.screenon); // set display off if disabled
   u8x8.draw2x2String(0, 0, "PAX:0");
-#ifdef BLECOUNTER
+#if BLECOUNTER
   u8x8.setCursor(0, 3);
   u8x8.printf("BLTH:0");
 #endif

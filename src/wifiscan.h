@@ -26,6 +26,7 @@ typedef struct {
 } wifi_ieee80211_packet_t;
 
 void wifi_sniffer_init(void);
+void wifi_country_set( const wifi_country_t* country );
 void wifi_sniffer_packet_handler(void *buff, wifi_promiscuous_pkt_type_t type);
 void ChannelSwitchIRQ(void);
 void wifi_channel_loop(void *pvParameters);

@@ -4,6 +4,7 @@
 // Basic config
 #include "globals.h"
 #include "senddata.h"
+#include "macsniff.h"
 
 // Local logging tag
 static const char TAG[] = "main";
@@ -72,10 +73,12 @@ uint64_t uptime() {
 }
 
 void reset_counters() {
+#if DEVICE_ROLE == ROLE_STANDALONE
   macs.clear();   // clear all macs container
   macs_total = 0; // reset all counters
   macs_wifi = 0;
   macs_ble = 0;
+#endif
 }
 
 #ifndef VERBOSE

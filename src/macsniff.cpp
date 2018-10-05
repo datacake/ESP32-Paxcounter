@@ -1,5 +1,6 @@
 
 // Basic Config
+#include "macsniff.h"
 #include "globals.h"
 
 #ifdef VENDORFILTER
@@ -42,6 +43,44 @@ uint64_t macConvert(uint8_t *paddr) {
          ((uint64_t)paddr[1] << 32) | ((uint64_t)paddr[0] << 40);
 }
 
+#if DEVICE_ROLE == ROLE_CHILD
+// As a child device we will report all packets to the parent device
+// add all packets to a queue here
+bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
+
+  // explicitly allocate RAM in external PSRAM
+  PacketEvent *p = (PacketEvent*) heap_caps_malloc( sizeof(PacketEvent) , MALLOC_CAP_SPIRAM);
+
+  if( p != nullptr )
+  {
+    memcpy( p->mac, paddr, 6 );
+    p->rssi = rssi;
+    p->channel = channel;
+    gettimeofday( &p->timestamp, NULL );
+  
+    portENTER_CRITICAL(&packetListMutex);
+    packets.push_back( p );
+    portEXIT_CRITICAL(&packetListMutex);
+  }
+  else
+  {
+    ESP_LOGE( TAG, "could not create PacketEvent" );
+  }
+
+  uint64_t mac = macConvert( paddr );
+
+  // Log scan result
+  ESP_LOGI(TAG,
+    "%s RSSI %ddBi -> MAC %012llX -> %08X addr -> %d Bytes left",
+    sniff_type == MAC_SNIFF_WIFI ? "WiFi" : "BLTH",
+    rssi,
+    mac,
+    p,
+    esp_get_free_heap_size());
+
+  return true;
+}
+#else
 bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
 
   char buff[16]; // temporary buffer for printf
@@ -125,7 +164,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
         blink_LED(COLOR_GREEN, 50);
 #endif
       }
-#ifdef BLECOUNTER
+#if BLECOUNTER
       else if (sniff_type == MAC_SNIFF_BLE) {
         macs_ble++; // increment BLE Macs counter
 #if (HAS_LED != NOT_A_PIN) || defined(HAS_RGB_LED)
@@ -168,3 +207,5 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
   return added; // function returns bool if a new and unique Wifi or BLE mac was
                 // counted (true) or not (false)
 }
+
+#endif

@@ -1,4 +1,4 @@
-#ifdef BLECOUNTER
+#if BLECOUNTER
 
 /* code snippets taken from
 https://github.com/nkolban/esp32-snippets/tree/master/BLE/scanner

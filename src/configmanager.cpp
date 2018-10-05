@@ -22,6 +22,11 @@ void defaultConfig() {
   cfg.sendcycle = SEND_SECS;  // payload send cycle [seconds/2]
   cfg.wifichancycle =
       WIFI_CHANNEL_SWITCH_INTERVAL; // wifi channel switch cycle [seconds/100]
+  strncpy( cfg.wifi.cc, WIFI_MY_COUNTRY, 3 );   // country code string
+  cfg.wifi.schan = WIFI_CHANNEL_MIN;            // start channel
+  cfg.wifi.nchan = WIFI_CHANNEL_MAX;            // total channel number
+  cfg.wifi.max_tx_power = 0;                    // maximum tx power
+  cfg.wifi.policy = WIFI_COUNTRY_POLICY_MANUAL; // country policy
   cfg.blescantime =
       BLESCANINTERVAL /
       10;          // BT channel scan cycle [seconds/100], default 1 (= 10ms)
@@ -146,6 +151,24 @@ void saveConfig() {
     if (nvs_get_i16(my_handle, "rssilimit", &flash16) != ESP_OK ||
         flash16 != cfg.rssilimit)
       nvs_set_i16(my_handle, "rssilimit", cfg.rssilimit);
+
+    // wifi settings
+    if (nvs_get_str(my_handle, "wifi.cc", storedversion, &required_size) !=
+            ESP_OK ||
+        strcmp(storedversion, cfg.wifi.cc) != 0)
+      nvs_set_str(my_handle, "wifi.cc", cfg.wifi.cc);
+
+    if (nvs_get_i8(my_handle, "wifi.schan", &flash8) != ESP_OK ||
+        flash8 != cfg.wifi.schan)
+      nvs_set_i8(my_handle, "wifi.schan", cfg.wifi.schan);
+
+    if (nvs_get_i8(my_handle, "wifi.nchan", &flash8) != ESP_OK ||
+        flash8 != cfg.wifi.nchan)
+      nvs_set_i8(my_handle, "wifi.nchan", cfg.wifi.nchan);
+
+    if (nvs_get_i8(my_handle, "wifi.policy", &flash8) != ESP_OK ||
+      flash8 != cfg.wifi.policy)
+      nvs_set_i8(my_handle, "wifi.policy", cfg.wifi.policy);
 
     err = nvs_commit(my_handle);
     nvs_close(my_handle);
@@ -323,6 +346,39 @@ void loadConfig() {
       ESP_LOGI(TAG, "Monitor mode = %d", flash8);
     } else {
       ESP_LOGI(TAG, "Monitor mode set to default %d", cfg.monitormode);
+      saveConfig();
+    }
+
+    // ---- wifi settings ------------------------------------------------------
+    if (nvs_get_str(my_handle, "wifi.cc", NULL, &required_size) == ESP_OK) {
+      nvs_get_str(my_handle, "wifi.cc", cfg.wifi.cc, &required_size);
+      ESP_LOGI(TAG, "WiFi country code = %s", cfg.wifi.cc);
+    } else {
+      ESP_LOGI(TAG, "WiFi country code set to default %s", cfg.wifi.cc);
+      saveConfig();
+    }
+
+    if (nvs_get_i8(my_handle, "wifi.schan", &flash8) == ESP_OK) {
+      cfg.wifi.schan = flash8;
+      ESP_LOGI(TAG, "WiFi start channel = %d", flash8);
+    } else {
+      ESP_LOGI(TAG, "WiFi start channel set to default %d", cfg.wifi.schan);
+      saveConfig();
+    }
+
+    if (nvs_get_i8(my_handle, "wifi.nchan", &flash8) == ESP_OK) {
+      cfg.wifi.nchan = flash8;
+      ESP_LOGI(TAG, "WiFi channel count = %d", flash8);
+    } else {
+      ESP_LOGI(TAG, "WiFi channel count set to default %d", cfg.wifi.nchan);
+      saveConfig();
+    }
+
+    if (nvs_get_i8(my_handle, "wifi.policy", &flash8) == ESP_OK) {
+      cfg.wifi.policy = (wifi_country_policy_t) flash8;
+      ESP_LOGI(TAG, "WiFi policy = %d", flash8);
+    } else {
+      ESP_LOGI(TAG, "WiFi policy set to default %d", cfg.wifi.policy);
       saveConfig();
     }
 

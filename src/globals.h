@@ -8,10 +8,21 @@
 #define PROGVERSION "1.4.23" // use max 10 chars here!
 #define PROGNAME "PAXCNT"
 
+#define ROLE_STANDALONE 0
+#define ROLE_PARENT     1
+#define ROLE_CHILD      2
+#define DEVICE_ROLE ROLE_CHILD
+
 // std::set for unified array functions
 #include <list>
 #include <array>
 #include <algorithm>
+
+// time handling
+#include <sys/time.h>
+
+// for use of 'wifi_countr_t' struct
+#include <esp_wifi.h>
 
 // Struct holding devices's runtime configuration
 typedef struct {
@@ -32,6 +43,7 @@ typedef struct {
   uint8_t gpsmode;       // 0=disabled, 1=enabled
   uint8_t monitormode;   // 0=disabled, 1=enabled
   char version[10];      // Firmware version
+  wifi_country_t wifi;   // wifi settings
 } configData_t;
 
 // Struct holding payload for data send queue
@@ -47,6 +59,14 @@ struct FoundDevice {
   uint8_t last_channel;
   time_t last_timestamp;
   uint32_t seen_count;
+};
+
+struct PacketEvent
+{
+  timeval  timestamp;
+  uint8_t   mac[6];
+  int8_t    rssi;
+  uint8_t   channel;
 };
 
 inline bool operator<(const FoundDevice& lhs, const FoundDevice& rhs)
@@ -65,11 +85,17 @@ struct FoundDeviceByMac {
 };
 
 // global variables
+#if DEVICE_ROLE == ROLE_CHILD
+extern std::list<PacketEvent*> packets;
+extern portMUX_TYPE packetListMutex;
+#elif DEVICE_ROLE == ROLE_STANDALONE
+extern std::list<FoundDevice> macs; // temp storage for MACs
+extern uint16_t macs_total, macs_wifi, macs_ble;
+#endif
 extern configData_t cfg;                      // current device configuration
 extern char display_line6[], display_line7[]; // screen buffers
 extern uint8_t channel;                       // wifi channel rotation counter
-extern uint16_t macs_total, macs_wifi, macs_ble, batt_voltage; // display values
-extern std::list<FoundDevice> macs; // temp storage for MACs
+extern uint16_t batt_voltage; // display values
 extern hw_timer_t *channelSwitch, *sendCycle;
 extern portMUX_TYPE timerMux;
 extern volatile int SendCycleTimerIRQ, HomeCycleIRQ, DisplayTimerIRQ,
@@ -105,7 +131,7 @@ extern std::array<uint64_t, 0xff> beacons;
 #include "button.h"
 #endif
 
-#ifdef BLECOUNTER
+#if BLECOUNTER
 #include "blescan.h"
 #endif
 

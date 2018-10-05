@@ -1,5 +1,6 @@
 // Basic Config
 #include "globals.h"
+#include "macsniff.h"
 
 // put data to send in RTos Queues used for transmit over channels Lora and SPI
 void SendData(uint8_t port) {
@@ -44,7 +45,9 @@ void sendPayload() {
 
     // append counter data to payload
     payload.reset();
+    #if DEVICE_ROLE == ROLE_STANDALONE
     payload.addCount(macs_wifi, cfg.blescan ? macs_ble : 0);
+    #endif
     // append GPS data, if present
 
 #ifdef HAS_GPS
@@ -96,10 +99,7 @@ void processSendBuffer() {
   }
 #endif
 
-#ifdef HAS_SPI
-#  if HAS_SPI_SLAVE
-  spi_slave_process();
-#  endif
+#if defined(HAS_SPI) && (DEVICE_ROLE == ROLE_STANDALONE)
   if (xQueueReceive(SPISendQueue, &SendBuffer, (TickType_t)0) == pdTRUE) {
 #  if HAS_SPI_SLAVE
     spi_slave_send( &SendBuffer );

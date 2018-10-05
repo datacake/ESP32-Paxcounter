@@ -54,7 +54,14 @@ portMUX_TYPE timerMux =
     portMUX_INITIALIZER_UNLOCKED; // sync main loop and ISR when modifying IRQ
                                   // handler shared variables
 
+#if DEVICE_ROLE == ROLE_CHILD
+std::list<PacketEvent*> packets;
+portMUX_TYPE packetListMutex = portMUX_INITIALIZER_UNLOCKED;
+#elif DEVICE_ROLE == ROLE_STANDALONE
 std::list<FoundDevice> macs; // container holding unique MAC adress hashes
+#else
+#error "You must define DEVICE_ROLE"
+#endif
 
 // initialize payload encoder
 PayloadConvert payload(PAYLOAD_BUFFER_SIZE);
@@ -182,7 +189,7 @@ void setup() {
 #endif
 
 // switch off bluetooth on esp32 module, if not compiled
-#ifdef BLECOUNTER
+#if BLECOUNTER
   strcat_P(features, " BLE");
 #else
   bool btstop = btStop();
@@ -287,7 +294,7 @@ void setup() {
 #endif
 
 // start BLE scan callback if BLE function is enabled in NVRAM configuration
-#ifdef BLECOUNTER
+#if BLECOUNTER
   if (cfg.blescan) {
     ESP_LOGI(TAG, "Starting BLE task on core 1");
     start_BLEscan();
@@ -328,6 +335,10 @@ void loop() {
     updateDisplay();
 #endif
 
+#if HAS_SPI_SLAVE
+    spi_slave_process();
+#endif
+
     // check housekeeping cycle and if expired do homework
     checkHousekeeping();
     // check send queue and process it
@@ -335,7 +346,7 @@ void loop() {
     // check send cycle and enqueue payload if cycle is expired
     sendPayload();
     // reset watchdog	
-    vTaskDelay(1 / portTICK_PERIOD_MS);
+    vTaskDelay(1);
 
   } // loop()
 }
