@@ -61,6 +61,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
     portENTER_CRITICAL(&packetListMutex);
     packets.push_back( p );
     portEXIT_CRITICAL(&packetListMutex);
+
+    blink_LED(COLOR_GREEN, 50);
   }
   else
   {
@@ -71,11 +73,12 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
 
   // Log scan result
   ESP_LOGI(TAG,
-    "%s RSSI %ddBi -> MAC %012llX -> %08X addr -> %d Bytes left",
+    "%s RSSI %ddBi -> MAC %012llX -> addr %08X -> pktCnt %.5d -> %d Bytes left",
     sniff_type == MAC_SNIFF_WIFI ? "WiFi" : "BLTH",
     rssi,
     mac,
-    p,
+    (unsigned int) p,
+    packets.size(),
     esp_get_free_heap_size());
 
   return true;

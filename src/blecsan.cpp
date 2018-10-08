@@ -1,5 +1,3 @@
-#if BLECOUNTER
-
 /* code snippets taken from
 https://github.com/nkolban/esp32-snippets/tree/master/BLE/scanner
 */
@@ -7,6 +5,8 @@ https://github.com/nkolban/esp32-snippets/tree/master/BLE/scanner
 // Basic Config
 #include "globals.h"
 #include "macsniff.h"
+
+#if BLECOUNTER
 
 // Bluetooth specific includes
 #include <esp_bt.h>

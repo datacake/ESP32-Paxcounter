@@ -22,7 +22,7 @@
 // ---- Function definition ----------------------------------------------------
 
 void spi_slave_init( void );
-void spi_slave_process( void );
+void spi_slave_task(void *pvParameters);
 void spi_slave_send( MessageBuffer_t* message );
 
 #endif

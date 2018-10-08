@@ -1,4 +1,6 @@
 /* switches wifi antenna, if board has switch internal / external antenna */
+#include "antenna.h"
+#include "globals.h"
 
 #ifdef HAS_ANTENNA_SWITCH
 

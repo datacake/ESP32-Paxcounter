@@ -2,6 +2,10 @@
 #include "globals.h"
 #include "led.h"
 
+#ifdef HAS_RGB_LED
+#include <SmartLeds.h>
+#endif
+
 led_states LEDState = LED_OFF; // LED state global for state machine
 led_states previousLEDState =
     LED_ON; // This will force LED to be off at boot since State is OFF

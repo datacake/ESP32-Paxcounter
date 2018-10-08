@@ -10,3 +10,4 @@ src/loraconf.h
 .vscode/.browse.c_cpp.db*
 .clang_complete
 .gcc-flags.json
+build/**

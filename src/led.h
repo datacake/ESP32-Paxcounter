@@ -1,10 +1,6 @@
 #ifndef _LED_H
 #define _LED_H
 
-#ifdef HAS_RGB_LED
-#include <SmartLeds.h>
-#endif
-
 // value for HSL color
 // see http://www.workwithcolor.com/blue-color-hue-range-01.htm
 #define COLOR_RED 0

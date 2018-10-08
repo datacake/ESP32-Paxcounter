@@ -4,7 +4,7 @@
 #define CFG_sx1276_radio 1
 #define HAS_LED NOT_A_PIN           // WiPy has no on board LED, so we use RGB LED on WiPy
 #define HAS_RGB_LED   GPIO_NUM_0    // WS2812B RGB LED on GPIO0
-#define BOARD_HAS_PSRAM             // use extra 4MB extern RAM
+//#define BOARD_HAS_PSRAM             // use extra 4MB extern RAM
 
 // Hardware pins for SPI SLAVE
 #define HAS_SPI_SLAVE 1

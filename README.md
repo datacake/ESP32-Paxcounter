@@ -70,7 +70,36 @@ If your device has silicon **Unique ID** which is stored in serial EEPROM Microc
 
 # Building
 
-Use <A HREF="https://platformio.org/">PlatformIO</A> with your preferred IDE for development and building this code. Make sure you have latest PlatformIO version.
+## Install
+
+This branch of the project has been migrated to build directly on the ESP-IDF. To build, it still requires the platformio compiler for ESP32 to be installed (it will be located in `~/.platformio/packages/toolchain-xtensa32/`).
+
+```
+platformio platform install espressif32
+```
+
+Configure your Serial flasher with menuconfig:
+
+```
+make menuconfig
+```
+
+Enter your USB Serial device under `Serial Flasher config` -> `Default serial port`
+
+## Build
+
+```
+make -j 4
+```
+
+## Upload
+
+Follow the instruction in [Uploading](#uploading) to set the device into Bootloader state.
+
+```
+make -j 4 flash
+```
+
 
 # Uploading
 

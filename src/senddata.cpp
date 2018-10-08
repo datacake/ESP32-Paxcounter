@@ -2,6 +2,8 @@
 #include "globals.h"
 #include "macsniff.h"
 
+static const char TAG[] = "SND";
+
 // put data to send in RTos Queues used for transmit over channels Lora and SPI
 void SendData(uint8_t port) {
 

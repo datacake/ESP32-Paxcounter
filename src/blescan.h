@@ -1,7 +1,7 @@
 #ifndef _BLESCAN_H
 #define _BLESCAN_H
 
-#include "macsniff.h"
+#include "globals.h"
 
 void start_BLEscan(void);
 void stop_BLEscan(void);

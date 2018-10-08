@@ -310,6 +310,11 @@ void setup() {
   reset_salt(); // get new 16bit for salting hashes
   xTaskCreatePinnedToCore(wifi_channel_loop, "wifiloop", 2048, (void *)1, 1,
                           NULL, 0);
+
+#if HAS_SPI_SLAVE
+  xTaskCreatePinnedToCore(spi_slave_task, "spislave", 2048, (void *)1, 1,
+                          NULL, 0);
+#endif
 } // setup()
 
 /* end Arduino SETUP
@@ -318,8 +323,8 @@ void setup() {
 /* begin Arduino main loop
  * ------------------------------------------------------ */
 
-void loop() {
-
+void loop()
+{
   while (1) {
     // state machine for switching display, LED, button, housekeeping, senddata
 
@@ -333,10 +338,6 @@ void loop() {
 
 #ifdef HAS_DISPLAY
     updateDisplay();
-#endif
-
-#if HAS_SPI_SLAVE
-    spi_slave_process();
 #endif
 
     // check housekeeping cycle and if expired do homework

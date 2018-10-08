@@ -1,6 +1,8 @@
 #ifndef _LORAWAN_H
 #define _LORAWAN_H
 
+#ifdef HAS_LORA
+
 // LMIC-Arduino LoRaWAN Stack
 #include <lmic.h>
 #include <hal/hal.h>
@@ -16,5 +18,7 @@ void os_getDevEui(u1_t *buf);
 void showLoraKeys(void);
 void lorawan_loop(void *pvParameters);
 void switch_lora(uint8_t sf, uint8_t tx);
+
+#endif
 
 #endif
