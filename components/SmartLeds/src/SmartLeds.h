@@ -322,10 +322,10 @@ public:
         devcfg.queue_size = TRANS_COUNT;
         devcfg.pre_cb = nullptr;
 
-        auto ret=spi_bus_initialize( HSPI_HOST, &buscfg, 1 );
+        auto ret=spi_bus_initialize( SPI_HOST, &buscfg, 0 );
         assert(ret==ESP_OK);
 
-        ret=spi_bus_add_device( HSPI_HOST, &devcfg, &_spi );
+        ret=spi_bus_add_device( SPI_HOST, &devcfg, &_spi );
         assert(ret==ESP_OK);
 
         std::fill_n( _finalFrame, FINAL_FRAME_SIZE, 0xFFFFFFFF );

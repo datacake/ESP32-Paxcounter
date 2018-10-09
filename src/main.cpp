@@ -57,7 +57,7 @@ portMUX_TYPE timerMux =
 #if DEVICE_ROLE == ROLE_CHILD
 std::list<PacketEvent*> packets;
 portMUX_TYPE packetListMutex = portMUX_INITIALIZER_UNLOCKED;
-#elif DEVICE_ROLE == ROLE_STANDALONE
+#elif (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
 std::list<FoundDevice> macs; // container holding unique MAC adress hashes
 #else
 #error "You must define DEVICE_ROLE"
@@ -148,10 +148,14 @@ void setup() {
   } else {
     ESP_LOGI(TAG, "SPI send queue created, size %d Bytes",
              SEND_QUEUE_SIZE * PAYLOAD_BUFFER_SIZE);
-#  if HAS_SPI_SLAVE
-    spi_slave_init();
-#  endif
   }
+#  if HAS_SPI_SLAVE
+  spi_slave_init();
+#  endif
+#endif
+
+#if (DEVICE_ROLE == ROLE_PARENT)
+  spi_master_init();
 #endif
 
     // initialize led
@@ -313,6 +317,11 @@ void setup() {
 
 #if HAS_SPI_SLAVE
   xTaskCreatePinnedToCore(spi_slave_task, "spislave", 2048, (void *)1, 1,
+                          NULL, 0);
+#endif
+
+#if (DEVICE_ROLE == ROLE_PARENT)
+  xTaskCreatePinnedToCore(spi_master_task, "spimaster", 2048, (void *)1, 1,
                           NULL, 0);
 #endif
 } // setup()

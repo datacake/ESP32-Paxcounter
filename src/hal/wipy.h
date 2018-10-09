@@ -12,7 +12,24 @@
 #define PIN_SPI_SLAVE_MOSI  GPIO_NUM_36
 #define PIN_SPI_SLAVE_MISO  GPIO_NUM_22
 #define PIN_SPI_SLAVE_SCK   GPIO_NUM_32
-#define PIN_SPI_SLAVE_IRQ   GPIO_NUM_13      // informs Master about new data
+
+// Hardware pins for SPI MASTER
+#define HAS_SPI_MASTER 1
+#define PIN_SPI_MASTER_MOSI GPIO_NUM_26
+#define PIN_SPI_MASTER_MISO GPIO_NUM_35
+#define PIN_SPI_MASTER_SCK  GPIO_NUM_4
+#define PIN_SPI_MASTER_SS1  GPIO_NUM_27
+#define PIN_SPI_MASTER_SS2  GPIO_NUM_5
+#define PIN_SPI_MASTER_SS3  GPIO_NUM_1
+#define PIN_SPI_MASTER_SS4  GPIO_NUM_0
+#define PIN_SPI_MASTER_SS5  GPIO_NUM_33
+#define PIN_SPI_MASTER_SS6  GPIO_NUM_25
+#define PIN_SPI_MASTER_SS7  GPIO_NUM_14
+#define PIN_SPI_MASTER_SS8  GPIO_NUM_19
+#define PIN_SPI_MASTER_SS9  GPIO_NUM_2
+#define PIN_SPI_MASTER_SS10 GPIO_NUM_12
+#define PIN_SPI_MASTER_SS11 GPIO_NUM_15
+#define PIN_SPI_MASTER_SS12 GPIO_NUM_13
 
 // select WIFI antenna (internal = onboard / external = u.fl socket)
 #define HAS_ANTENNA_SWITCH  21      // pin for switching wifi antenna

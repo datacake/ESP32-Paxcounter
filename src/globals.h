@@ -11,7 +11,7 @@
 #define ROLE_STANDALONE 0
 #define ROLE_PARENT     1
 #define ROLE_CHILD      2
-#define DEVICE_ROLE ROLE_CHILD
+#define DEVICE_ROLE ROLE_PARENT
 
 // std::set for unified array functions
 #include <list>
@@ -88,7 +88,7 @@ struct FoundDeviceByMac {
 #if DEVICE_ROLE == ROLE_CHILD
 extern std::list<PacketEvent*> packets;
 extern portMUX_TYPE packetListMutex;
-#elif DEVICE_ROLE == ROLE_STANDALONE
+#elif (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
 extern std::list<FoundDevice> macs; // temp storage for MACs
 extern uint16_t macs_total, macs_wifi, macs_ble;
 #endif
@@ -121,6 +121,10 @@ extern std::array<uint64_t, 0xff> beacons;
 
 #if defined(HAS_SPI) && defined(HAS_SPI_SLAVE)
 #include "spi_slave.h"
+#endif
+
+#if (DEVICE_ROLE == ROLE_PARENT)
+#include "spi_master.h"
 #endif
 
 #ifdef HAS_DISPLAY
