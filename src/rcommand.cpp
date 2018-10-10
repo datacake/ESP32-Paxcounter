@@ -152,7 +152,7 @@ void set_blescan(uint8_t val[]) {
   if (cfg.blescan)
     start_BLEscan();
   else {
-    #if DEVICE_ROLE == ROLE_STANDALONE
+    #if (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
     macs_ble = 0; // clear BLE counter
     #endif
     stop_BLEscan();

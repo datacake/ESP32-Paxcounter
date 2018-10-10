@@ -18,11 +18,11 @@
 #include <array>
 #include <algorithm>
 
-// time handling
-#include <sys/time.h>
-
 // for use of 'wifi_countr_t' struct
 #include <esp_wifi.h>
+
+// for PacketEvent
+#include "PacketEvent.h"
 
 // Struct holding devices's runtime configuration
 typedef struct {
@@ -59,14 +59,6 @@ struct FoundDevice {
   uint8_t last_channel;
   time_t last_timestamp;
   uint32_t seen_count;
-};
-
-struct PacketEvent
-{
-  timeval  timestamp;
-  uint8_t   mac[6];
-  int8_t    rssi;
-  uint8_t   channel;
 };
 
 inline bool operator<(const FoundDevice& lhs, const FoundDevice& rhs)

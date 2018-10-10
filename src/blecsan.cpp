@@ -167,7 +167,7 @@ IRAM_ATTR void gap_callback_handler(esp_gap_ble_cb_event_t event,
 #endif
 
       // add this device and show new count total if it was not previously added
-      mac_add((uint8_t *)p->scan_rst.bda, p->scan_rst.rssi, MAC_SNIFF_BLE, 0);
+      mac_add((uint8_t *)p->scan_rst.bda, p->scan_rst.rssi, 0);
 
       /* to be improved in vendorfilter if:
       
@@ -231,7 +231,8 @@ esp_err_t register_ble_callback(void) {
 
       .scan_interval =
           (uint16_t)(cfg.blescantime * 10 / 0.625),    // Time = N * 0.625 msec
-      .scan_window = (uint16_t)(BLESCANWINDOW / 0.625) // Time = N * 0.625 msec
+      .scan_window = (uint16_t)(BLESCANWINDOW / 0.625),// Time = N * 0.625 msec
+      .scan_duplicate = BLE_SCAN_DUPLICATE_ENABLE
   };
 
   ESP_LOGI(TAG, "Set GAP scan parameters");
@@ -259,11 +260,18 @@ void start_BLEscan(void) {
 
 void stop_BLEscan(void) {
   ESP_LOGI(TAG, "Shutting down bluetooth scanner ...");
-  ESP_ERROR_CHECK(esp_ble_gap_register_callback(NULL));
-  ESP_ERROR_CHECK(esp_bluedroid_disable());
-  ESP_ERROR_CHECK(esp_bluedroid_deinit());
-  btStop(); // disable & deinit bt_controller
-  ESP_LOGI(TAG, "Bluetooth scanner stopped");
+  if( esp_bluedroid_get_status() == ESP_BLUEDROID_STATUS_ENABLED )
+  {
+    ESP_ERROR_CHECK(esp_ble_gap_register_callback(NULL));
+    ESP_ERROR_CHECK(esp_bluedroid_disable());
+    ESP_ERROR_CHECK(esp_bluedroid_deinit());
+    btStop(); // disable & deinit bt_controller
+    ESP_LOGI(TAG, "Bluetooth scanner stopped");
+  }
+  else
+  {
+    ESP_LOGI( TAG, "Bluetooth already stopped");
+  }
 } // stop_BLEscan
 
 #endif // BLECOUNTER

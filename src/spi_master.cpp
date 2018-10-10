@@ -19,6 +19,7 @@
 
 #include "globals.h"
 
+#include "PacketEvent.h"
 #include "driver/spi_master.h"
 
 // ---- Local defines ----------------------------------------------------------
@@ -66,6 +67,7 @@ static void post_transport_callback(spi_transaction_t* trans)
     gpio_set_level( (gpio_num_t)(int) trans->user, 1 );
 
     // notify thread that one slot has become available
+    // (if realtime response is necessary, use xSemaphoreGiveFromISR() instead)
     xSemaphoreGive( spiProcessSemaphore );
 }
 
@@ -145,9 +147,73 @@ void spi_master_task(void *pvParameters)
 {
     configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
 
+    // ---- Setup phase --------------------------------------------------------
+    #define SETUP_STEP_COUNT 1
+    {
+        uint8_t setupDevice = 0;
+        while( setupDevice <  SPI_DEVICE_COUNT)
+        {
+            ESP_LOGI( "SPIM", "Setup device %d", setupDevice );
+            uint8_t step = 0;
+            while( step < SETUP_STEP_COUNT )
+            {
+                spi_transaction_t* t;
+                // retrieve spent transactions
+                if( spi_device_get_trans_result( device, &t, 0 ) == ESP_OK )
+                {
+                    ESP_LOGI( "SPIM", "Setup got trans result");
+                    // step after each packet has been sent
+                    step++;
+                    // free transfer slot
+                    t->length = 0;
+                }
+
+                // only use first transaction during setup phase
+                t = &transactions[0];
+                
+                if( t->length == 0 && step < SETUP_STEP_COUNT )
+                {
+                    uint8_t* sendbuf = (uint8_t*) t->tx_buffer;
+                    memset( sendbuf, 0, SPI_MASTER_BUFFER_SIZE );
+
+                    switch( step )
+                    {
+                        case 0:
+                            // turn off BLE SCAN
+                            sendbuf[0] = 4;
+                            sendbuf[1] = RCMDPORT;
+                            sendbuf[2] = 0x0e;
+                            sendbuf[3] = false;
+                            break;
+                    }
+
+                    t->user = (void*) ChipselectLines[ setupDevice ];
+                    t->length = SPI_MASTER_BUFFER_SIZE * 8;
+
+                    esp_err_t ret = spi_device_queue_trans( device, t, 0 );
+
+                    if( ret != ESP_OK )
+                    {
+                        ESP_LOGW( "SPIM", "Setup: SPI device queue was not empty" );
+                    }
+                    else
+                    {
+                        ESP_LOGI( "SPIM", "Setup sent step %d device %d", step, setupDevice );
+                    }
+                }
+
+                vTaskDelay( 1 * portTICK_PERIOD_MS );
+            }
+            setupDevice++;
+        }
+    }
+
+    // ---- Run phase ----------------------------------------------------------
+
+    ESP_LOGI( "SPIM", "Starting SPI Master run loop" );
+
     while(1)
     {
-
         if( xSemaphoreTake( spiProcessSemaphore, portMAX_DELAY ) == pdTRUE )
         {
             spi_transaction_t* t;
@@ -156,7 +222,7 @@ void spi_master_task(void *pvParameters)
             
             if( ret == ESP_OK )
             {
-                //ESP_LOGI("SPIS", "received %d bytes", t->trans_len / 8 );
+                //ESP_LOGI("SPIM", "received %d bytes", t->trans_len / 8 );
 
                 uint8_t* recvbuf = (uint8_t*) t->rx_buffer;
 
@@ -166,10 +232,30 @@ void spi_master_task(void *pvParameters)
                     // only processing CHILD messages
                     if( recvbuf[1] == 0x80 )
                     {
-                        // TODO check checksum
-                    }
+                        // check checksum
+                        uint8_t msg_len = recvbuf[0];
 
-                    // TODO parse packet and pass to macsniff
+                        uint8_t sum = 0;
+                        for(int i=0; i < msg_len; i++ )
+                        {
+                            sum += recvbuf[i];
+                        }
+
+                        if( sum != 0 )
+                        {
+                            ESP_LOGW( "SPIM", "checksum error");
+                            break;
+                        }
+
+                        uint8_t pktCnt = ( msg_len - 7 ) / PACKET_EVENT_PACKED_SIZE;
+                        for( int pktNo=0; pktNo < pktCnt; pktNo++ )
+                        {
+                            PacketEvent pkt;
+                            uint8_t offset = 6 + pktNo * PACKET_EVENT_PACKED_SIZE;
+                            pkt.fromBuffer( &recvbuf[ offset ] );
+                            mac_add( pkt.mac, pkt.rssi, pkt.channel );
+                        }
+                    }
 
                     // clear
                     recvbuf[0] = 0;
@@ -188,8 +274,6 @@ void spi_master_task(void *pvParameters)
                 {
                     // TODO command queue erstellen und abarbeiten
 
-                    ESP_LOGI( "SPIS", "setting up query to %d", queryDeviceNumber );
-
                     memset( sendbuf, 0, SPI_MASTER_BUFFER_SIZE );
 
                     t->user = (void*) ChipselectLines[ queryDeviceNumber ];
@@ -199,12 +283,12 @@ void spi_master_task(void *pvParameters)
 
                     if( ret != ESP_OK )
                     {
-                        ESP_LOGW( "SPIS", "SPI device queue was not empty" );
+                        ESP_LOGW( "SPIM", "SPI device queue was not empty" );
                     }
-                    else
-                    {
-                        ESP_LOGI( "SPIS", "enqueued query to %d, line %i", queryDeviceNumber, (gpio_num_t)(int) t->user );
-                    }
+                    // else
+                    // {
+                    //     ESP_LOGI( "SPIM", "enqueued query to %d, line %i", queryDeviceNumber, (gpio_num_t)(int) t->user );
+                    // }
 
                     // round-robin
                     queryDeviceNumber = ((queryDeviceNumber + 1) % SPI_DEVICE_COUNT);
@@ -235,6 +319,6 @@ void spi_master_send( MessageBuffer_t* message )
 
     // if( ret != ESP_OK )
     // {
-    //     ESP_LOGW( "SPIS", "SPI Slave device queue was not empty", ret );
+    //     ESP_LOGW( "SPIM", "SPI Slave device queue was not empty", ret );
     // }
 }

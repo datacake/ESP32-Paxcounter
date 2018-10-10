@@ -46,12 +46,6 @@ static void post_transport_callback(spi_slave_transaction_t *trans)
     xSemaphoreGive( spiProcessSemaphore );
 }
 
-// called when SS goes low
-static void IRAM_ATTR ss_isr_handler(void* arg)
-{
-
-}
-
 // ---- Public Functions -------------------------------------------------------
 
 /**
@@ -83,42 +77,10 @@ void spi_slave_init(void)
         .post_trans_cb =    post_transport_callback
     };
 
-#if DEVICE_ROLE == ROLE_STANDALONE
-    // Configuration for the handshake line
-    gpio_config_t io_conf = 
-    {
-        .pin_bit_mask = BIT( PIN_SPI_SLAVE_IRQ ),
-        .mode =         GPIO_MODE_OUTPUT,
-        .pull_up_en =   GPIO_PULLUP_DISABLE,
-        .pull_down_en = GPIO_PULLDOWN_DISABLE,
-        .intr_type =    GPIO_INTR_DISABLE
-    };
-    // Configure handshake line as output
-    assert( gpio_config( &io_conf ) == ESP_OK);
-#endif
-
-#if DEVICE_ROLE == ROLE_CHILD
-    // // --- register an interrupt handler for SS line ---------------------------
-    // gpio_install_isr_service( 0 );
-
-    // gpio_config_t io_conf = 
-    // {
-    //     .pin_bit_mask = ( 1ULL << PIN_SPI_SLAVE_SS ),
-    //     .mode =         GPIO_MODE_INPUT,
-    //     .pull_up_en =   GPIO_PULLUP_ENABLE,
-    //     .pull_down_en = GPIO_PULLDOWN_DISABLE,
-    //     .intr_type =    GPIO_INTR_NEGEDGE
-    // };
-
-    // // Configure SS line as interrupt input
-    // assert( gpio_config( &io_conf ) == ESP_OK);
-    // gpio_isr_handler_add( PIN_SPI_SLAVE_SS, ss_isr_handler, NULL );
-
     msg_id = 0;
     cmd_ack = 0;
 
     memset( transactions, 0, sizeof(transactions) );
-#endif
 
     // Setup all Queues
     for( int qNo = 0; qNo < SPI_QUEUE_SIZE; qNo++ )
@@ -236,23 +198,7 @@ void spi_slave_task(void *pvParameters)
                         portEXIT_CRITICAL(&packetListMutex);
 
                         size_t offset = pktNo * 16;
-                        sendbuf[6  + offset] = pkt->timestamp.tv_sec >> 24;
-                        sendbuf[7  + offset] = pkt->timestamp.tv_sec >> 16;
-                        sendbuf[8  + offset] = pkt->timestamp.tv_sec >> 8;
-                        sendbuf[9  + offset] = pkt->timestamp.tv_sec;
-                        sendbuf[10 + offset] = pkt->timestamp.tv_usec >> 24;
-                        sendbuf[11 + offset] = pkt->timestamp.tv_usec >> 16;
-                        sendbuf[12 + offset] = pkt->timestamp.tv_usec >> 8;
-                        sendbuf[13 + offset] = pkt->timestamp.tv_usec;
-                        sendbuf[14 + offset] = pkt->mac[0];
-                        sendbuf[15 + offset] = pkt->mac[1];
-                        sendbuf[16 + offset] = pkt->mac[2];
-                        sendbuf[17 + offset] = pkt->mac[3];
-                        sendbuf[18 + offset] = pkt->mac[4];
-                        sendbuf[19 + offset] = pkt->mac[5];
-                        sendbuf[20 + offset] = pkt->rssi;
-                        sendbuf[21 + offset] = pkt->channel;
-                        msg_len += 16;
+                        msg_len += pkt->toBuffer( &sendbuf[6  + offset], SPI_SLAVE_BUFFER_SIZE - 6 - offset);
 
                         // really important!!! we need to free the memory
                         free(pkt);
@@ -291,6 +237,15 @@ void spi_slave_task(void *pvParameters)
                     // {
                     //     ESP_LOGI( "SPIS", "enqueued %d bytes", msg_len );
                     // }
+                #elif DEVICE_ROLE == ROLE_PARENT
+                    t->length = SPI_SLAVE_BUFFER_SIZE * 8;
+                    t->trans_len = 0;
+                    esp_err_t ret = spi_slave_queue_trans( VSPI_HOST, t, 0 );
+
+                    if( ret != ESP_OK )
+                    {
+                        ESP_LOGW( "SPIS", "SPI Slave device queue was not empty" );
+                    }
                 #endif
                 }
             }

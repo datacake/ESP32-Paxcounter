@@ -47,7 +47,7 @@ void sendPayload() {
 
     // append counter data to payload
     payload.reset();
-    #if DEVICE_ROLE == ROLE_STANDALONE
+    #if (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
     payload.addCount(macs_wifi, cfg.blescan ? macs_ble : 0);
     #endif
     // append GPS data, if present
@@ -101,7 +101,7 @@ void processSendBuffer() {
   }
 #endif
 
-#if defined(HAS_SPI) && (DEVICE_ROLE == ROLE_STANDALONE)
+#if defined(HAS_SPI) && ((DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT))
   if (xQueueReceive(SPISendQueue, &SendBuffer, (TickType_t)0) == pdTRUE) {
 #  if HAS_SPI_SLAVE
     spi_slave_send( &SendBuffer );
@@ -116,7 +116,7 @@ void processSendBuffer() {
       (uptime_ms / 3600000),
       (uptime_ms / 60000) % 60,
       (uptime_ms / 1000) % 60,
-      ESP.getFreeHeap());
+      esp_get_free_heap_size());
     printf("------------------------------------------------------------------\n");
     printf("MAC          | CH | RSSI | LAST [sec] | COUNT  \n");
 

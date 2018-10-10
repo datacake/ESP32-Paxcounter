@@ -73,7 +73,7 @@ uint64_t uptime() {
 }
 
 void reset_counters() {
-#if DEVICE_ROLE == ROLE_STANDALONE
+#if (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
   macs.clear();   // clear all macs container
   macs_total = 0; // reset all counters
   macs_wifi = 0;

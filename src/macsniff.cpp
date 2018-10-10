@@ -46,7 +46,7 @@ uint64_t macConvert(uint8_t *paddr) {
 #if DEVICE_ROLE == ROLE_CHILD
 // As a child device we will report all packets to the parent device
 // add all packets to a queue here
-bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
+bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
 
   // explicitly allocate RAM in external PSRAM
   PacketEvent *p = (PacketEvent*) heap_caps_malloc( sizeof(PacketEvent) , MALLOC_CAP_SPIRAM);
@@ -73,8 +73,9 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
 
   // Log scan result
   ESP_LOGI(TAG,
-    "%s RSSI %ddBi -> MAC %012llX -> addr %08X -> pktCnt %.5d -> %d Bytes left",
-    sniff_type == MAC_SNIFF_WIFI ? "WiFi" : "BLTH",
+    "%s ch %d RSSI %ddBi -> MAC %012llX -> addr %08X -> pktCnt %.5d -> %d Bytes left",
+    channel == 0 ? "BLTH" : "WiFi",
+    channel,
     rssi,
     mac,
     (unsigned int) p,
@@ -84,8 +85,8 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
   return true;
 }
 #else
-bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
-
+bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
+  bool sniff_type = (channel == 0) ? MAC_SNIFF_BLE : MAC_SNIFF_WIFI;
   char buff[16]; // temporary buffer for printf
   bool added = false;
   int8_t beaconID;    // beacon number in test monitor mode
@@ -192,12 +193,14 @@ bool mac_add(uint8_t *paddr, int8_t rssi, bool sniff_type, int channel) {
     } // added
 
     // Log scan result
-    ESP_LOGD(TAG,
-             "%s %s RSSI %ddBi -> MAC %s -> Hash %04X -> WiFi:%d  BLTH:%d -> "
-             "%d Bytes left",
-             added ? "new  " : "known",
-             sniff_type == MAC_SNIFF_WIFI ? "WiFi" : "BLTH", rssi, buff,
-             hashedmac, macs_wifi, macs_ble, ESP.getFreeHeap());
+    ESP_LOGI(TAG,
+      "%s %s RSSI %ddBi -> MAC %012llX -> Hash %04X -> WiFi:%d  BLTH:%d -> "
+      "%d Bytes left",
+      added ? "new  " : "known",
+      sniff_type == MAC_SNIFF_WIFI ? "WiFi" : "BLTH",
+      rssi,
+      mac,
+      hashedmac, macs_wifi, macs_ble, esp_get_free_heap_size());
 #ifdef VENDORFILTER
   } else {
     // Very noisy
