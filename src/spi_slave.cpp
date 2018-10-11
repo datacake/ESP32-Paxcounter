@@ -22,28 +22,62 @@
 // ---- Local defines ----------------------------------------------------------
 
 #define SPI_SLAVE_BUFFER_SIZE   64
-#define SPI_QUEUE_SIZE          5
+#define SPI_QUEUE_SIZE          1
 
 static uint8_t txBuffer[SPI_QUEUE_SIZE][SPI_SLAVE_BUFFER_SIZE];
 static uint8_t rxBuffer[SPI_QUEUE_SIZE][SPI_SLAVE_BUFFER_SIZE];
 static uint8_t cmd_ack;
 static uint8_t msg_id;
 static spi_slave_transaction_t transactions[SPI_QUEUE_SIZE];
-static SemaphoreHandle_t spiProcessSemaphore;
+static SemaphoreHandle_t spiProcessSemaphore, spiInitSemaphore, spiDeInitSemaphore;
+
+static void post_setup_callback(spi_slave_transaction_t *trans);
+static void post_transport_callback(spi_slave_transaction_t *trans);
+
+// Configuration for the SPI bus
+static spi_bus_config_t buscfg =
+{
+    .mosi_io_num = PIN_SPI_SLAVE_MOSI,
+    .miso_io_num = PIN_SPI_SLAVE_MISO,
+    .sclk_io_num = PIN_SPI_SLAVE_SCK,
+    .quadwp_io_num = -1,
+    .quadhd_io_num = -1,
+    .max_transfer_sz = SPI_SLAVE_BUFFER_SIZE,
+    .flags = 0
+};
+
+// Configuration for the SPI slave interface
+static spi_slave_interface_config_t slvcfg = 
+{
+    .spics_io_num =     PIN_SPI_SLAVE_SS,
+    .flags =            0,
+    .queue_size =       SPI_QUEUE_SIZE,
+    .mode =             0,
+    .post_setup_cb =    post_setup_callback,
+    .post_trans_cb =    post_transport_callback
+};
 
 // ---- Local Functions --------------------------------------------------------
 
 // Called after a transaction is queued and ready for pickup by master. We use this to set the handshake line high.
-static void post_setup_callback(spi_slave_transaction_t *trans) 
+static void post_setup_callback(spi_slave_transaction_t *trans)
 {
-
+    
 }
 
 // Called after transaction is sent/received. We use this to set the handshake line low.
 static void post_transport_callback(spi_slave_transaction_t *trans)
 {
+    xSemaphoreGive( spiDeInitSemaphore );
+
     // notify thread that one slot has become available
     xSemaphoreGive( spiProcessSemaphore );
+}
+
+// called when SS goes low
+static void IRAM_ATTR ss_isr_handler(void* arg)
+{
+    xSemaphoreGive( spiInitSemaphore );
 }
 
 // ---- Public Functions -------------------------------------------------------
@@ -54,28 +88,21 @@ static void post_transport_callback(spi_slave_transaction_t *trans)
  */
 void spi_slave_init(void)
 {
-    // Configuration for the SPI bus
-    spi_bus_config_t buscfg =
+    // // --- register an interrupt handler for SS line ---------------------------
+    gpio_install_isr_service( 0 );
+
+    gpio_config_t io_conf = 
     {
-        .mosi_io_num = PIN_SPI_SLAVE_MOSI,
-        .miso_io_num = PIN_SPI_SLAVE_MISO,
-        .sclk_io_num = PIN_SPI_SLAVE_SCK,
-        .quadwp_io_num = -1,
-        .quadhd_io_num = -1,
-        .max_transfer_sz = SPI_SLAVE_BUFFER_SIZE,
-        .flags = 0
+        .pin_bit_mask = ( 1ULL << PIN_SPI_SLAVE_SS ),
+        .mode =         GPIO_MODE_INPUT,
+        .pull_up_en =   GPIO_PULLUP_ENABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type =    GPIO_INTR_NEGEDGE
     };
 
-    // Configuration for the SPI slave interface
-    spi_slave_interface_config_t slvcfg = 
-    {
-        .spics_io_num =     PIN_SPI_SLAVE_SS,
-        .flags =            0,
-        .queue_size =       SPI_QUEUE_SIZE,
-        .mode =             0,
-        .post_setup_cb =    post_setup_callback,
-        .post_trans_cb =    post_transport_callback
-    };
+    // Configure SS line as interrupt input
+    assert( gpio_config( &io_conf ) == ESP_OK);
+    gpio_isr_handler_add( PIN_SPI_SLAVE_SS, ss_isr_handler, NULL );
 
     msg_id = 0;
     cmd_ack = 0;
@@ -94,30 +121,34 @@ void spi_slave_init(void)
     assert( gpio_set_pull_mode( PIN_SPI_SLAVE_SCK, GPIO_PULLUP_ONLY ) == ESP_OK);
     assert( gpio_set_pull_mode( PIN_SPI_SLAVE_SS, GPIO_PULLUP_ONLY ) == ESP_OK);
 
-    // Initialize SPI slave interface
-    assert( spi_slave_initialize( VSPI_HOST, &buscfg, &slvcfg, 1 ) == ESP_OK);
-
     // Create a semaphore for IRQ / Task sync
     spiProcessSemaphore = xSemaphoreCreateCounting( SPI_QUEUE_SIZE, SPI_QUEUE_SIZE );
+    spiInitSemaphore = xSemaphoreCreateCounting( 1, 0 );
+    spiDeInitSemaphore = xSemaphoreCreateCounting( 1, 0 );
 }
 
 void spi_slave_task(void *pvParameters)
 {
+    int spi_state = 0;
     configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
 
     while(1)
     {
-
-        if( xSemaphoreTake( spiProcessSemaphore, portMAX_DELAY ) == pdTRUE )
+        switch( spi_state )
         {
-            spi_slave_transaction_t* t;
-            
-            esp_err_t ret = spi_slave_get_trans_result( VSPI_HOST, &t, 0 );
-            
-            if( ret == ESP_OK )
-            {
-                // ESP_LOGI("SPIS", "received %d bytes", t->trans_len / 8 );
 
+        case 0:
+            // wait forever on process semaphore
+            xSemaphoreTake( spiProcessSemaphore, portMAX_DELAY );
+            
+            // clear the other two in case they are set (no blocking)
+            xSemaphoreTake( spiInitSemaphore, 0 );
+            xSemaphoreTake( spiDeInitSemaphore, 0 );
+
+            for(int txNo = 0; txNo < SPI_QUEUE_SIZE; txNo++ )
+            {
+                spi_slave_transaction_t* t = &transactions[txNo];
+                uint8_t* sendbuf = (uint8_t*) t->tx_buffer;
                 uint8_t* recvbuf = (uint8_t*) t->rx_buffer;
 
                 // did we receive something?
@@ -135,17 +166,6 @@ void spi_slave_task(void *pvParameters)
 
                 // free transfer slot
                 t->length = 0;
-            }
-            else
-            {
-                // if we couldn't get a free slot, then give this semaphore back
-                //xSemaphoreGive( spiProcessSemaphore );
-            }
-
-            for(int txNo = 0; txNo < SPI_QUEUE_SIZE; txNo++ )
-            {
-                t = &transactions[txNo];
-                uint8_t* sendbuf = (uint8_t*) t->tx_buffer;
 
                 if( t->length == 0 )
                 {
@@ -227,28 +247,55 @@ void spi_slave_task(void *pvParameters)
                     t->length = SPI_SLAVE_BUFFER_SIZE * 8;
                     t->trans_len = 0;
 
-                    esp_err_t ret = spi_slave_queue_trans( VSPI_HOST, t, 0 );
+                    ESP_LOGI( "SPIS", "setup");
 
-                    if( ret != ESP_OK )
-                    {
-                        ESP_LOGW( "SPIS", "SPI Slave device queue was not empty" );
-                    }
-                    // else
-                    // {
-                    //     ESP_LOGI( "SPIS", "enqueued %d bytes", msg_len );
-                    // }
                 #elif DEVICE_ROLE == ROLE_PARENT
                     t->length = SPI_SLAVE_BUFFER_SIZE * 8;
                     t->trans_len = 0;
-                    esp_err_t ret = spi_slave_queue_trans( VSPI_HOST, t, 0 );
-
-                    if( ret != ESP_OK )
-                    {
-                        ESP_LOGW( "SPIS", "SPI Slave device queue was not empty" );
-                    }
                 #endif
                 }
             }
+            spi_state = 1;
+            break;
+
+        case 1:
+            xSemaphoreTake( spiInitSemaphore, portMAX_DELAY );
+
+            // Initialize SPI slave interface
+            assert( spi_slave_initialize( VSPI_HOST, &buscfg, &slvcfg, 1 ) == ESP_OK);
+
+            // enqueue free buffers
+            for(int txNo = 0; txNo < SPI_QUEUE_SIZE; txNo++ )
+            {
+                spi_slave_transaction_t* t = &transactions[txNo];
+                uint8_t* sendbuf = (uint8_t*) t->tx_buffer;
+
+                if( t->length != 0 )
+                {
+                    spi_slave_queue_trans( VSPI_HOST, t, 0 );
+
+                    ESP_LOGI( "SPIS", "init");
+                }
+            }
+            spi_state = 2;
+            break;
+
+        case 2:
+            xSemaphoreTake( spiDeInitSemaphore, portMAX_DELAY );
+            ESP_LOGI( "SPIS", "de-init");
+
+            // retrieve result
+            spi_slave_transaction_t* t;
+            spi_slave_get_trans_result( VSPI_HOST, &t, 0 );
+
+            // de-init SPI
+            spi_slave_free( VSPI_HOST );
+
+            // make MISO passive
+            gpio_set_direction( PIN_SPI_SLAVE_MISO, GPIO_MODE_INPUT );
+
+            spi_state = 0;
+            break;
         }
     }
 }
