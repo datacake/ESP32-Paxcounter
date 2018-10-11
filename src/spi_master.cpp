@@ -25,8 +25,8 @@
 // ---- Local defines ----------------------------------------------------------
 
 #define SPI_MASTER_BUFFER_SIZE  64
-#define SPI_QUEUE_SIZE          2
-#define SPI_DEVICE_COUNT        2
+#define SPI_QUEUE_SIZE          1
+#define SPI_DEVICE_COUNT        12
 
 static uint8_t txBuffer[SPI_QUEUE_SIZE][SPI_MASTER_BUFFER_SIZE];
 static uint8_t rxBuffer[SPI_QUEUE_SIZE][SPI_MASTER_BUFFER_SIZE];
@@ -38,17 +38,17 @@ static SemaphoreHandle_t spiProcessSemaphore;
 static gpio_num_t ChipselectLines[SPI_DEVICE_COUNT] =
 {
     PIN_SPI_MASTER_SS1,
-    // PIN_SPI_MASTER_SS2,
-    // PIN_SPI_MASTER_SS3,
-    // PIN_SPI_MASTER_SS4,
-    // PIN_SPI_MASTER_SS5,
-    // PIN_SPI_MASTER_SS6,
-    // PIN_SPI_MASTER_SS7,
+    PIN_SPI_MASTER_SS2,
+    PIN_SPI_MASTER_SS3,
+    PIN_SPI_MASTER_SS4,
+    PIN_SPI_MASTER_SS5,
+    PIN_SPI_MASTER_SS6,
+    PIN_SPI_MASTER_SS7,
     PIN_SPI_MASTER_SS8,
-    // PIN_SPI_MASTER_SS9,
-    // PIN_SPI_MASTER_SS10,
-    // PIN_SPI_MASTER_SS11,
-    // PIN_SPI_MASTER_SS12
+    PIN_SPI_MASTER_SS9,
+    PIN_SPI_MASTER_SS10,
+    PIN_SPI_MASTER_SS11,
+    PIN_SPI_MASTER_SS12
 };
 
 // ---- Local Functions --------------------------------------------------------
@@ -57,7 +57,7 @@ static gpio_num_t ChipselectLines[SPI_DEVICE_COUNT] =
 static void pre_transport_callback(spi_transaction_t* trans)
 {
     // assert the correct Chipselect line
-    gpio_set_level( (gpio_num_t)(int) trans->user, 0 );
+    //gpio_set_level( (gpio_num_t)(int) trans->user, 0 );
 }
 
 // Called after transaction is sent/received.
@@ -103,8 +103,8 @@ void spi_master_init(void)
         .dummy_bits =       0,
         .mode =             0,
         .duty_cycle_pos =   128,
-        .cs_ena_pretrans =  0,
-        .cs_ena_posttrans = 0,
+        .cs_ena_pretrans =  16,
+        .cs_ena_posttrans = 16,
         .clock_speed_hz =   1*1000*1000,
         .input_delay_ns =   0,
         .spics_io_num =     -1,
@@ -148,7 +148,7 @@ void spi_master_task(void *pvParameters)
     configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
 
     // ---- Setup phase --------------------------------------------------------
-    #define SETUP_STEP_COUNT 1
+    #define SETUP_STEP_COUNT 2
     {
         uint8_t setupDevice = 0;
         while( setupDevice <  SPI_DEVICE_COUNT)
@@ -184,6 +184,15 @@ void spi_master_task(void *pvParameters)
                             sendbuf[1] = RCMDPORT;
                             sendbuf[2] = 0x0e;
                             sendbuf[3] = false;
+                            break;
+
+                        case 1:
+                            // configure channel
+                            sendbuf[0] = 5;
+                            sendbuf[1] = RCMDPORT;
+                            sendbuf[2] = 0x40;
+                            sendbuf[3] = setupDevice + 1;
+                            sendbuf[4] = 1;
                             break;
                     }
 
@@ -272,11 +281,18 @@ void spi_master_task(void *pvParameters)
 
                 if( t->length == 0 )
                 {
-                    // TODO command queue erstellen und abarbeiten
+                    // Get correct chipselect
+                    t->user = (void*) ChipselectLines[ queryDeviceNumber ];
 
+                    // assert Chipselect
+                    gpio_set_level( (gpio_num_t)(int) t->user, 0 );
+
+                    // delay before transaction
+                    vTaskDelay( 1 * portTICK_PERIOD_MS );
+
+                    // clear
                     memset( sendbuf, 0, SPI_MASTER_BUFFER_SIZE );
 
-                    t->user = (void*) ChipselectLines[ queryDeviceNumber ];
                     t->length = SPI_MASTER_BUFFER_SIZE * 8;
 
                     esp_err_t ret = spi_device_queue_trans( device, t, 0 );
