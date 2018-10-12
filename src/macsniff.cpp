@@ -63,8 +63,6 @@ bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
     portENTER_CRITICAL(&packetListMutex);
     packets.push_back( p );
     portEXIT_CRITICAL(&packetListMutex);
-
-    blink_LED(COLOR_GREEN, 50);
   }
   else
   {
@@ -72,6 +70,16 @@ bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
   }
 
   uint64_t mac = macConvert( paddr );
+
+  uint32_t vendor2int = ((uint32_t)paddr[2]) | ((uint32_t)paddr[1] << 8) |
+               ((uint32_t)paddr[0] << 16);
+  
+  // pass vendorfilter?
+  if (  (channel == 0) ||                 // always pass BLE
+        (cfg.vendorfilter == 0) ||        // always pass when cfg.vendorfilter=0
+      std::find(vendors.begin(), vendors.end(), vendor2int) != vendors.end()) {
+    blink_LED(COLOR_GREEN, 50);
+  }
 
   // Log scan result
   ESP_LOGD(TAG,

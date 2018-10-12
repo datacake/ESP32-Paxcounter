@@ -7,7 +7,7 @@
 // attn: increment version after modifications to configData_t truct!
 #define PROGVERSION "1.4.23" // use max 10 chars here!
 #define PROGNAME "PAXCNT"
-#define BUILD_NUMBER    1
+#define BUILD_NUMBER    2
 
 #define ROLE_STANDALONE 0
 #define ROLE_PARENT     1
