@@ -68,16 +68,29 @@ static void post_setup_callback(spi_slave_transaction_t *trans)
 // Called after transaction is sent/received. We use this to set the handshake line low.
 static void post_transport_callback(spi_slave_transaction_t *trans)
 {
-    xSemaphoreGive( spiDeInitSemaphore );
+    // make sure pins are passive first thing after transmission
+    gpio_set_direction( PIN_SPI_SLAVE_MOSI, GPIO_MODE_INPUT );
+    gpio_set_direction( PIN_SPI_SLAVE_SCK, GPIO_MODE_INPUT );
+    gpio_set_direction( PIN_SPI_SLAVE_MISO, GPIO_MODE_INPUT );
+
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    xSemaphoreGiveFromISR( spiDeInitSemaphore, &xHigherPriorityTaskWoken );
 
     // notify thread that one slot has become available
-    xSemaphoreGive( spiProcessSemaphore );
+    xSemaphoreGiveFromISR( spiProcessSemaphore, &xHigherPriorityTaskWoken );
+
+    portYIELD_FROM_ISR();
 }
 
 // called when SS goes low
 static void IRAM_ATTR ss_isr_handler(void* arg)
 {
-    xSemaphoreGive( spiInitSemaphore );
+    BaseType_t xHigherPriorityTaskWoken = pdFALSE;
+
+    xSemaphoreGiveFromISR( spiInitSemaphore, &xHigherPriorityTaskWoken );
+
+    portYIELD_FROM_ISR();
 }
 
 // ---- Public Functions -------------------------------------------------------
@@ -116,9 +129,9 @@ void spi_slave_init(void)
         transactions[qNo].rx_buffer = &rxBuffer[qNo][0];
     }
 
-    // Enable pull-ups on SPI lines so we don't detect rogue pulses when no master is connected.
-    assert( gpio_set_pull_mode( PIN_SPI_SLAVE_MOSI, GPIO_PULLUP_ONLY ) == ESP_OK);
-    assert( gpio_set_pull_mode( PIN_SPI_SLAVE_SCK, GPIO_PULLUP_ONLY ) == ESP_OK);
+    // // Enable pull-ups on SPI lines so we don't detect rogue pulses when no master is connected.
+    // assert( gpio_set_pull_mode( PIN_SPI_SLAVE_MOSI, GPIO_PULLUP_ONLY ) == ESP_OK);
+    // assert( gpio_set_pull_mode( PIN_SPI_SLAVE_SCK, GPIO_PULLUP_ONLY ) == ESP_OK);
     assert( gpio_set_pull_mode( PIN_SPI_SLAVE_SS, GPIO_PULLUP_ONLY ) == ESP_OK);
 
     // Create a semaphore for IRQ / Task sync
@@ -131,6 +144,12 @@ void spi_slave_task(void *pvParameters)
 {
     int spi_state = 0;
     configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
+
+    ESP_LOGI( "SPIS", "PaxRover Build: %u, Role: %s",
+        (int) BUILD_NUMBER,
+        DEVICE_ROLE == ROLE_CHILD ? "CHILD" : "PARENT" );
+
+    ESP_LOGI( "SPIS", "---- Starting SPI Slave run loop ----");
 
     while(1)
     {
@@ -192,7 +211,6 @@ void spi_slave_task(void *pvParameters)
                     //   .. |    12   |    13   |   14    |   15    |
                     //   .. |  mac[4] |  mac[5] |  rssi   | channel |
 
-                    uint8_t ev_len = sizeof(PacketEvent);
                     uint16_t pkt_queue_len;
                     portENTER_CRITICAL(&packetListMutex);
                     size_t qLen = packets.size();
@@ -218,7 +236,9 @@ void spi_slave_task(void *pvParameters)
                         portEXIT_CRITICAL(&packetListMutex);
 
                         size_t offset = pktNo * 16;
-                        msg_len += pkt->toBuffer( &sendbuf[6  + offset], SPI_SLAVE_BUFFER_SIZE - 6 - offset);
+                        msg_len += pkt->toBuffer(
+                            &sendbuf[SPI_HDR_LEN + offset],
+                            SPI_SLAVE_BUFFER_SIZE - SPI_HDR_LEN - offset);
 
                         // really important!!! we need to free the memory
                         free(pkt);
@@ -228,13 +248,15 @@ void spi_slave_task(void *pvParameters)
                     pkt_queue_len -= pktNo;
 
                     // add header
-                    msg_len += 7;
+                    msg_len += SPI_HDR_LEN + 1; // HDR_LEN + CHECKSUM (1 byte)
                     sendbuf[0] = msg_len;
                     sendbuf[1] = 0x80; // port for CHILD messages
                     sendbuf[2] = cmd_ack;
                     sendbuf[3] = msg_id++;
                     sendbuf[4] = pkt_queue_len >> 8;
                     sendbuf[5] = pkt_queue_len;
+                    sendbuf[6] = (BUILD_NUMBER >> 8) | (DEVICE_ROLE << 6);
+                    sendbuf[7] = BUILD_NUMBER;
 
                     // calc checksum
                     uint8_t sum = 0;
@@ -247,8 +269,6 @@ void spi_slave_task(void *pvParameters)
                     t->length = SPI_SLAVE_BUFFER_SIZE * 8;
                     t->trans_len = 0;
 
-                    ESP_LOGI( "SPIS", "setup");
-
                 #elif DEVICE_ROLE == ROLE_PARENT
                     t->length = SPI_SLAVE_BUFFER_SIZE * 8;
                     t->trans_len = 0;
@@ -259,6 +279,7 @@ void spi_slave_task(void *pvParameters)
             break;
 
         case 1:
+            // wait forever
             xSemaphoreTake( spiInitSemaphore, portMAX_DELAY );
 
             // Initialize SPI slave interface
@@ -268,21 +289,18 @@ void spi_slave_task(void *pvParameters)
             for(int txNo = 0; txNo < SPI_QUEUE_SIZE; txNo++ )
             {
                 spi_slave_transaction_t* t = &transactions[txNo];
-                uint8_t* sendbuf = (uint8_t*) t->tx_buffer;
 
                 if( t->length != 0 )
                 {
                     spi_slave_queue_trans( VSPI_HOST, t, 0 );
-
-                    ESP_LOGI( "SPIS", "init");
                 }
             }
             spi_state = 2;
             break;
 
         case 2:
+            // wait forever
             xSemaphoreTake( spiDeInitSemaphore, portMAX_DELAY );
-            ESP_LOGI( "SPIS", "de-init");
 
             // retrieve result
             spi_slave_transaction_t* t;
@@ -290,9 +308,6 @@ void spi_slave_task(void *pvParameters)
 
             // de-init SPI
             spi_slave_free( VSPI_HOST );
-
-            // make MISO passive
-            gpio_set_direction( PIN_SPI_SLAVE_MISO, GPIO_MODE_INPUT );
 
             spi_state = 0;
             break;

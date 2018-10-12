@@ -103,8 +103,8 @@ void spi_master_init(void)
         .dummy_bits =       0,
         .mode =             0,
         .duty_cycle_pos =   128,
-        .cs_ena_pretrans =  16,
-        .cs_ena_posttrans = 16,
+        .cs_ena_pretrans =  0,
+        .cs_ena_posttrans = 0,
         .clock_speed_hz =   1*1000*1000,
         .input_delay_ns =   0,
         .spics_io_num =     -1,
@@ -124,13 +124,19 @@ void spi_master_init(void)
         transactions[qNo].rx_buffer = &rxBuffer[qNo][0];
     }
 
-    // Enable pull-up on SPI MISO line
-    assert( gpio_set_pull_mode( PIN_SPI_MASTER_MISO, GPIO_PULLUP_ONLY ) == ESP_OK);
-    
+    gpio_config_t io_conf = 
+    {
+        .pin_bit_mask = 0,
+        .mode =         GPIO_MODE_OUTPUT,
+        .pull_up_en =   GPIO_PULLUP_DISABLE,
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,
+        .intr_type =    GPIO_INTR_DISABLE
+    };
+
     for( int i=0; i < SPI_DEVICE_COUNT; i++ )
     {
-        assert( gpio_set_level( ChipselectLines[i], 1) == ESP_OK );
-        assert( gpio_set_direction( ChipselectLines[i], GPIO_MODE_OUTPUT ) == ESP_OK);
+        io_conf.pin_bit_mask = ( 1ULL << ChipselectLines[i] );
+        assert( gpio_config( &io_conf ) == ESP_OK );
     }
 
     // Initialize SPI Master interface
@@ -147,8 +153,13 @@ void spi_master_task(void *pvParameters)
 {
     configASSERT(((uint32_t)pvParameters) == 1); // FreeRTOS check
 
+    // Delay setup phase until all Children have had enough time to boot
+    vTaskDelay( 5000 * portTICK_PERIOD_MS );
+
+    ESP_LOGI( "SPIM", "---- Starting Child device Setup ----" );
+
     // ---- Setup phase --------------------------------------------------------
-    #define SETUP_STEP_COUNT 2
+    #define SETUP_STEP_COUNT 4
     {
         uint8_t setupDevice = 0;
         while( setupDevice <  SPI_DEVICE_COUNT)
@@ -161,7 +172,6 @@ void spi_master_task(void *pvParameters)
                 // retrieve spent transactions
                 if( spi_device_get_trans_result( device, &t, 0 ) == ESP_OK )
                 {
-                    ESP_LOGI( "SPIM", "Setup got trans result");
                     // step after each packet has been sent
                     step++;
                     // free transfer slot
@@ -194,6 +204,22 @@ void spi_master_task(void *pvParameters)
                             sendbuf[3] = setupDevice + 1;
                             sendbuf[4] = 1;
                             break;
+
+                        case 2:
+                            // forward Parent vendorfilter setting
+                            sendbuf[0] = 4;
+                            sendbuf[1] = RCMDPORT;
+                            sendbuf[2] = 0x0d;
+                            sendbuf[3] = cfg.vendorfilter;
+                            break;
+
+                        case 3:
+                            // forward Parent Antenna setting
+                            sendbuf[0] = 4;
+                            sendbuf[1] = RCMDPORT;
+                            sendbuf[2] = 0x0f;
+                            sendbuf[3] = cfg.wifiant;
+                            break;
                     }
 
                     t->user = (void*) ChipselectLines[ setupDevice ];
@@ -207,7 +233,7 @@ void spi_master_task(void *pvParameters)
                     }
                     else
                     {
-                        ESP_LOGI( "SPIM", "Setup sent step %d device %d", step, setupDevice );
+                        ESP_LOGD( "SPIM", "Setup sent step %d device %d", step, setupDevice );
                     }
                 }
 
@@ -219,7 +245,7 @@ void spi_master_task(void *pvParameters)
 
     // ---- Run phase ----------------------------------------------------------
 
-    ESP_LOGI( "SPIM", "Starting SPI Master run loop" );
+    ESP_LOGI( "SPIM", "--- Starting SPI Master run loop ---" );
 
     while(1)
     {
@@ -253,16 +279,17 @@ void spi_master_task(void *pvParameters)
                         if( sum != 0 )
                         {
                             ESP_LOGW( "SPIM", "checksum error");
-                            break;
                         }
-
-                        uint8_t pktCnt = ( msg_len - 7 ) / PACKET_EVENT_PACKED_SIZE;
-                        for( int pktNo=0; pktNo < pktCnt; pktNo++ )
+                        else
                         {
-                            PacketEvent pkt;
-                            uint8_t offset = 6 + pktNo * PACKET_EVENT_PACKED_SIZE;
-                            pkt.fromBuffer( &recvbuf[ offset ] );
-                            mac_add( pkt.mac, pkt.rssi, pkt.channel );
+                            uint8_t pktCnt = ( msg_len - (SPI_HDR_LEN + 1) ) / PACKET_EVENT_PACKED_SIZE;
+                            for( int pktNo=0; pktNo < pktCnt; pktNo++ )
+                            {
+                                PacketEvent pkt;
+                                uint8_t offset = SPI_HDR_LEN + pktNo * PACKET_EVENT_PACKED_SIZE;
+                                pkt.fromBuffer( &recvbuf[ offset ] );
+                                mac_add( pkt.mac, pkt.rssi, pkt.channel );
+                            }
                         }
                     }
 
@@ -281,13 +308,16 @@ void spi_master_task(void *pvParameters)
 
                 if( t->length == 0 )
                 {
+                    // delay after last transaction
+                    vTaskDelay( 1 * portTICK_PERIOD_MS );
+
                     // Get correct chipselect
                     t->user = (void*) ChipselectLines[ queryDeviceNumber ];
 
                     // assert Chipselect
                     gpio_set_level( (gpio_num_t)(int) t->user, 0 );
 
-                    // delay before transaction
+                    // delay for Chipselect setup time
                     vTaskDelay( 1 * portTICK_PERIOD_MS );
 
                     // clear

@@ -57,12 +57,16 @@ void wifi_channel_loop(void *pvParameters) {
       ChannelTimerIRQ = 0;
       portEXIT_CRITICAL(&timerMux);
       // rotates variable channel 1..WIFI_CHANNEL_MAX
-      channel = (channel % cfg.wifi.nchan) + cfg.wifi.schan;
-      esp_wifi_set_channel(channel, WIFI_SECOND_CHAN_NONE);
-      ESP_LOGD(TAG, "Wifi set channel %d", channel);
+      uint8_t new_channel = (channel % cfg.wifi.nchan) + cfg.wifi.schan;
+      if( new_channel != channel )
+      {
+        esp_wifi_set_channel(new_channel, WIFI_SECOND_CHAN_NONE);
+        ESP_LOGD(TAG, "Wifi set channel %d", new_channel);
+        channel = new_channel;
+      }
     }
 
-    vTaskDelay(1 / portTICK_PERIOD_MS); // reset watchdog
+    vTaskDelay(1 * portTICK_PERIOD_MS); // reset watchdog
 
   } // end of infinite wifi channel rotation loop
 }

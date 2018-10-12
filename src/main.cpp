@@ -112,7 +112,7 @@ void setup() {
                                                          : "external");
   ESP_LOGI(TAG, "ESP32 SDK: %s", ESP.getSdkVersion());
   ESP_LOGI(TAG, "Free RAM: %d bytes", ESP.getFreeHeap());
-
+  
 #ifdef HAS_GPS
   ESP_LOGI(TAG, "TinyGPS+ v%s", TinyGPSPlus::libraryVersion());
 #endif
@@ -293,7 +293,7 @@ void setup() {
 #ifdef HAS_GPS
   if (cfg.gpsmode) {
     ESP_LOGI(TAG, "Starting GPS task on core 0");
-    xTaskCreatePinnedToCore(gps_loop, "gpsloop", 2048, (void *)1, 2, NULL, 0);
+    xTaskCreatePinnedToCore(gps_loop, "gpsloop", 2048, (void *)1, 2, NULL, 1);
   }
 #endif
 
@@ -313,16 +313,16 @@ void setup() {
   // gets it's seed from RF noise
   reset_salt(); // get new 16bit for salting hashes
   xTaskCreatePinnedToCore(wifi_channel_loop, "wifiloop", 2048, (void *)1, 1,
-                          NULL, 0);
+                          NULL, 1);
 
 #if HAS_SPI_SLAVE
-  xTaskCreatePinnedToCore(spi_slave_task, "spislave", 2048, (void *)1, 1,
-                          NULL, 0);
+  xTaskCreatePinnedToCore(spi_slave_task, "spislave", 2048, (void *)1, 4,
+                          NULL, 1);
 #endif
 
 #if (DEVICE_ROLE == ROLE_PARENT)
-  xTaskCreatePinnedToCore(spi_master_task, "spimaster", 2048, (void *)1, 1,
-                          NULL, 0);
+  xTaskCreatePinnedToCore(spi_master_task, "spimaster", 2048, (void *)1, 3,
+                          NULL, 1);
 #endif
 } // setup()
 

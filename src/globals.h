@@ -7,11 +7,14 @@
 // attn: increment version after modifications to configData_t truct!
 #define PROGVERSION "1.4.23" // use max 10 chars here!
 #define PROGNAME "PAXCNT"
+#define BUILD_NUMBER    1
 
 #define ROLE_STANDALONE 0
 #define ROLE_PARENT     1
 #define ROLE_CHILD      2
-#define DEVICE_ROLE ROLE_PARENT
+#define DEVICE_ROLE ROLE_CHILD
+
+#define SPI_HDR_LEN     8
 
 // std::set for unified array functions
 #include <list>
@@ -23,6 +26,8 @@
 
 // for PacketEvent
 #include "PacketEvent.h"
+
+#include "Paxcounter.conf"
 
 // Struct holding devices's runtime configuration
 typedef struct {

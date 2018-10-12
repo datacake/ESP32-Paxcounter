@@ -229,7 +229,7 @@ void lorawan_loop(void *pvParameters) {
 
   while (1) {
     os_runloop_once();                  // execute LMIC jobs
-    vTaskDelay(1 / portTICK_PERIOD_MS); // reset watchdog
+    vTaskDelay(1 * portTICK_PERIOD_MS); // reset watchdog
   }
 }
 

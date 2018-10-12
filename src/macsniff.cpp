@@ -48,6 +48,8 @@ uint64_t macConvert(uint8_t *paddr) {
 // add all packets to a queue here
 bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
 
+  // TODO add vendorfilter (at least to LED)
+
   // explicitly allocate RAM in external PSRAM
   PacketEvent *p = (PacketEvent*) heap_caps_malloc( sizeof(PacketEvent) , MALLOC_CAP_SPIRAM);
 
@@ -72,7 +74,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
   uint64_t mac = macConvert( paddr );
 
   // Log scan result
-  ESP_LOGI(TAG,
+  ESP_LOGD(TAG,
     "%s ch %d RSSI %ddBi -> MAC %012llX -> addr %08X -> pktCnt %.5d -> %d Bytes left",
     channel == 0 ? "BLTH" : "WiFi",
     channel,
@@ -106,8 +108,10 @@ bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
 #ifdef VENDORFILTER
   vendor2int = ((uint32_t)paddr[2]) | ((uint32_t)paddr[1] << 8) |
                ((uint32_t)paddr[0] << 16);
-  // use OUI vendor filter list only on Wifi, not on BLE
-  if ((sniff_type == MAC_SNIFF_BLE) ||
+  
+  // pass vendorfilter?
+  if (  (sniff_type == MAC_SNIFF_BLE) ||  // always pass BLE
+        (cfg.vendorfilter == 0) ||        // always pass when cfg.vendorfilter=0
       std::find(vendors.begin(), vendors.end(), vendor2int) != vendors.end()) {
 #endif
 
@@ -193,7 +197,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
     } // added
 
     // Log scan result
-    ESP_LOGI(TAG,
+    ESP_LOGD(TAG,
       "%s %s RSSI %ddBi -> MAC %012llX -> Hash %04X -> WiFi:%d  BLTH:%d -> "
       "%d Bytes left",
       added ? "new  " : "known",
@@ -204,7 +208,7 @@ bool mac_add(uint8_t *paddr, int8_t rssi, int channel) {
 #ifdef VENDORFILTER
   } else {
     // Very noisy
-    // ESP_LOGD(TAG, "Filtered MAC %02X:%02X:%02X:%02X:%02X:%02X",
+    // ESP_LOGV(TAG, "Filtered MAC %02X:%02X:%02X:%02X:%02X:%02X",
     // paddr[0],paddr[1],paddr[2],paddr[3],paddr[5],paddr[5]);
   }
 #endif
