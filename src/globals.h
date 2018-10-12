@@ -12,7 +12,7 @@
 #define ROLE_STANDALONE 0
 #define ROLE_PARENT     1
 #define ROLE_CHILD      2
-#define DEVICE_ROLE ROLE_CHILD
+#define DEVICE_ROLE ROLE_PARENT
 
 #define SPI_HDR_LEN     8
 

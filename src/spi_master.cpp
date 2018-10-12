@@ -137,6 +137,7 @@ void spi_master_init(void)
     {
         io_conf.pin_bit_mask = ( 1ULL << ChipselectLines[i] );
         assert( gpio_config( &io_conf ) == ESP_OK );
+        gpio_set_level( ChipselectLines[i], 1 );
     }
 
     // Initialize SPI Master interface
@@ -156,10 +157,70 @@ void spi_master_task(void *pvParameters)
     // Delay setup phase until all Children have had enough time to boot
     vTaskDelay( 5000 * portTICK_PERIOD_MS );
 
-    ESP_LOGI( "SPIM", "---- Starting Child device Setup ----" );
+    // ---- Clear phase --------------------------------------------------------
+    ESP_LOGI( "SPIM", "---- Starting Clear Phase ----" );
+    {
+        uint8_t setupDevice = 0;
+        while( setupDevice <  SPI_DEVICE_COUNT)
+        {
+            ESP_LOGI( "SPIM", "Clear device %d", setupDevice );
+            uint8_t step = 0;
+            while( step < 1 )
+            {
+                spi_transaction_t* t;
+                // retrieve spent transactions
+                if( spi_device_get_trans_result( device, &t, 0 ) == ESP_OK )
+                {
+                    ESP_LOGD( "SPIM", "Cleared device %d", setupDevice );
+
+                    // step after each packet has been sent
+                    step++;
+                    // free transfer slot
+                    t->length = 0;
+                }
+
+                // only use first transaction during setup phase
+                t = &transactions[0];
+                
+                if( t->length == 0 && step < 1 )
+                {
+                    // delay after last transaction
+                    vTaskDelay( 1 * portTICK_PERIOD_MS );
+
+                    // Get correct chipselect
+                    t->user = (void*) ChipselectLines[ setupDevice ];
+
+                    // assert Chipselect
+                    gpio_set_level( (gpio_num_t)(int) t->user, 0 );
+
+                    // delay for Chipselect setup time
+                    vTaskDelay( 1 * portTICK_PERIOD_MS );
+
+                    // send nothing (dummy)
+                    uint8_t* sendbuf = (uint8_t*) t->tx_buffer;
+                    memset( sendbuf, 0, SPI_MASTER_BUFFER_SIZE );
+
+                    t->length = SPI_MASTER_BUFFER_SIZE * 8;
+
+                    esp_err_t ret = spi_device_queue_trans( device, t, 0 );
+
+                    if( ret != ESP_OK )
+                    {
+                        ESP_LOGW( "SPIM", "Clear: SPI device queue was not empty" );
+                    }
+                }
+
+                vTaskDelay( 50 * portTICK_PERIOD_MS );
+            }
+            setupDevice++;
+        }
+    }
+
+    vTaskDelay( 50 * portTICK_PERIOD_MS );
 
     // ---- Setup phase --------------------------------------------------------
-    #define SETUP_STEP_COUNT 4
+    ESP_LOGI( "SPIM", "---- Starting Child device Setup ----" );
+    #define SETUP_STEP_COUNT 5
     {
         uint8_t setupDevice = 0;
         while( setupDevice <  SPI_DEVICE_COUNT)
@@ -172,6 +233,18 @@ void spi_master_task(void *pvParameters)
                 // retrieve spent transactions
                 if( spi_device_get_trans_result( device, &t, 0 ) == ESP_OK )
                 {
+                    uint8_t* recvbuf = (uint8_t*) t->rx_buffer;
+
+                    if( step == 1 )
+                    {
+                        if( recvbuf[6] >> 6 != ROLE_CHILD )
+                        {
+                            ESP_LOGE( "SPIM", "Invalid ROLE response from device %d", setupDevice );
+                        }
+                        uint16_t build = (recvbuf[6] & 0x3F) << 8 | recvbuf[7];
+                        ESP_LOGI( "SPIM", "Device BUILD_NUMBER: %d", build );
+                    }
+                    
                     // step after each packet has been sent
                     step++;
                     // free transfer slot
@@ -183,12 +256,29 @@ void spi_master_task(void *pvParameters)
                 
                 if( t->length == 0 && step < SETUP_STEP_COUNT )
                 {
+                    // delay after last transaction
+                    vTaskDelay( 50 * portTICK_PERIOD_MS );
+
+                    // Get correct chipselect
+                    t->user = (void*) ChipselectLines[ setupDevice ];
+
+                    // assert Chipselect
+                    gpio_set_level( (gpio_num_t)(int) t->user, 0 );
+
+                    // delay for Chipselect setup time
+                    vTaskDelay( 1 * portTICK_PERIOD_MS );
+
                     uint8_t* sendbuf = (uint8_t*) t->tx_buffer;
                     memset( sendbuf, 0, SPI_MASTER_BUFFER_SIZE );
 
                     switch( step )
                     {
                         case 0:
+                            // dummy write to make sure everyone is
+                            // on the same page
+                            break;
+                        
+                        case 1:
                             // turn off BLE SCAN
                             sendbuf[0] = 4;
                             sendbuf[1] = RCMDPORT;
@@ -196,7 +286,7 @@ void spi_master_task(void *pvParameters)
                             sendbuf[3] = false;
                             break;
 
-                        case 1:
+                        case 2:
                             // configure channel
                             sendbuf[0] = 5;
                             sendbuf[1] = RCMDPORT;
@@ -205,7 +295,7 @@ void spi_master_task(void *pvParameters)
                             sendbuf[4] = 1;
                             break;
 
-                        case 2:
+                        case 3:
                             // forward Parent vendorfilter setting
                             sendbuf[0] = 4;
                             sendbuf[1] = RCMDPORT;
@@ -213,7 +303,7 @@ void spi_master_task(void *pvParameters)
                             sendbuf[3] = cfg.vendorfilter;
                             break;
 
-                        case 3:
+                        case 4:
                             // forward Parent Antenna setting
                             sendbuf[0] = 4;
                             sendbuf[1] = RCMDPORT;
@@ -222,7 +312,6 @@ void spi_master_task(void *pvParameters)
                             break;
                     }
 
-                    t->user = (void*) ChipselectLines[ setupDevice ];
                     t->length = SPI_MASTER_BUFFER_SIZE * 8;
 
                     esp_err_t ret = spi_device_queue_trans( device, t, 0 );
@@ -236,12 +325,12 @@ void spi_master_task(void *pvParameters)
                         ESP_LOGD( "SPIM", "Setup sent step %d device %d", step, setupDevice );
                     }
                 }
-
-                vTaskDelay( 1 * portTICK_PERIOD_MS );
             }
             setupDevice++;
         }
     }
+
+    vTaskDelay( 50 * portTICK_PERIOD_MS );
 
     // ---- Run phase ----------------------------------------------------------
 
