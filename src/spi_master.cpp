@@ -185,7 +185,7 @@ void spi_master_task(void *pvParameters)
                 if( t->length == 0 && step < 1 )
                 {
                     // delay after last transaction
-                    vTaskDelay( 1 * portTICK_PERIOD_MS );
+                    vTaskDelay( 10 * portTICK_PERIOD_MS );
 
                     // Get correct chipselect
                     t->user = (void*) ChipselectLines[ setupDevice ];
@@ -209,8 +209,6 @@ void spi_master_task(void *pvParameters)
                         ESP_LOGW( "SPIM", "Clear: SPI device queue was not empty" );
                     }
                 }
-
-                vTaskDelay( 50 * portTICK_PERIOD_MS );
             }
             setupDevice++;
         }
@@ -257,7 +255,7 @@ void spi_master_task(void *pvParameters)
                 if( t->length == 0 && step < SETUP_STEP_COUNT )
                 {
                     // delay after last transaction
-                    vTaskDelay( 50 * portTICK_PERIOD_MS );
+                    vTaskDelay( 100 * portTICK_PERIOD_MS );
 
                     // Get correct chipselect
                     t->user = (void*) ChipselectLines[ setupDevice ];

@@ -71,7 +71,6 @@ void PayloadConvert::addStatus(uint16_t voltage, uint64_t uptime,
   buffer[cursor++] = (byte)((mem & 0x000000FF));
 }
 
-#ifdef HAS_GPS
 void PayloadConvert::addGPS(gpsStatus_t value) {
   buffer[cursor++] = (byte)((value.latitude & 0xFF000000) >> 24);
   buffer[cursor++] = (byte)((value.latitude & 0x00FF0000) >> 16);
@@ -87,7 +86,12 @@ void PayloadConvert::addGPS(gpsStatus_t value) {
   buffer[cursor++] = highByte(value.altitude);
   buffer[cursor++] = lowByte(value.altitude);
 }
-#endif
+
+void PayloadConvert::addUint16( uint16_t value )
+{
+  buffer[cursor++] = highByte( value );
+  buffer[cursor++] = lowByte( value );
+}
 
 #ifdef HAS_BUTTON
 void PayloadConvert::addButton(uint8_t value) { buffer[cursor++] = value; }

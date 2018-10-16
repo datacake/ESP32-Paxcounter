@@ -32,6 +32,10 @@ char display_line6[16], display_line7[16]; // display buffers
 uint8_t channel = 0;                       // channel rotation counter
 uint16_t macs_total = 0, macs_wifi = 0, macs_ble = 0,
          batt_voltage = 0; // globals for display
+uint16_t wifi_new = 0, wifi_lastSend = 0, wifi_last10mins = 0, wifi_last20mins = 0, wifi_last30mins = 0;
+
+// last time data was added to send queues
+uint32_t last_sendTime_ms;
 
 // hardware timer for cyclic tasks
 hw_timer_t *channelSwitch = NULL, *displaytimer = NULL, *sendCycle = NULL,

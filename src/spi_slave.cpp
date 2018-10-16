@@ -164,6 +164,8 @@ void spi_slave_task(void *pvParameters)
             xSemaphoreTake( spiInitSemaphore, 0 );
             xSemaphoreTake( spiDeInitSemaphore, 0 );
 
+            ESP_LOGD("SPIS", "setup");
+
             for(int txNo = 0; txNo < SPI_QUEUE_SIZE; txNo++ )
             {
                 spi_slave_transaction_t* t = &transactions[txNo];
@@ -182,9 +184,6 @@ void spi_slave_task(void *pvParameters)
                     // clear
                     recvbuf[0] = 0;
                 }
-
-                // free transfer slot
-                t->length = 0;
 
                 if( t->length == 0 )
                 {
@@ -270,7 +269,25 @@ void spi_slave_task(void *pvParameters)
                     t->trans_len = 0;
 
                 #elif DEVICE_ROLE == ROLE_PARENT
-                    t->length = SPI_SLAVE_BUFFER_SIZE * 8;
+                    MessageBuffer_t message;
+                    ESP_LOGD( "SPIS", "send?");
+                    if (xQueueReceive(SPISendQueue, &message, (TickType_t)0) == pdTRUE)
+                    {
+                        ESP_LOGI( "SPIS", "%d bytes queued to SPI", message.MessageSize);
+                        // copy data to send-buffer
+                        int totalMessageLength = message.MessageSize + 2;
+                        sendbuf[ 0 ] = totalMessageLength;
+                        sendbuf[ 1 ] = message.MessagePort;
+                        memcpy( &sendbuf[ 2 ], message.Message, message.MessageSize );
+                        t->length = totalMessageLength * 8;
+                    }
+                    else
+                    {
+                        // send nothing (all zeroes)
+                        t->length = SPI_SLAVE_BUFFER_SIZE * 8;
+                        memset( sendbuf, 0, SPI_SLAVE_BUFFER_SIZE );
+                    }
+
                     t->trans_len = 0;
                 #endif
                 }
@@ -281,6 +298,8 @@ void spi_slave_task(void *pvParameters)
         case 1:
             // wait forever
             xSemaphoreTake( spiInitSemaphore, portMAX_DELAY );
+
+            ESP_LOGD("SPIS", "init");
 
             // Initialize SPI slave interface
             assert( spi_slave_initialize( VSPI_HOST, &buscfg, &slvcfg, 1 ) == ESP_OK);
@@ -302,9 +321,14 @@ void spi_slave_task(void *pvParameters)
             // wait forever
             xSemaphoreTake( spiDeInitSemaphore, portMAX_DELAY );
 
+            ESP_LOGD("SPIS", "de-init");
+
             // retrieve result
             spi_slave_transaction_t* t;
             spi_slave_get_trans_result( VSPI_HOST, &t, 0 );
+
+            // free transfer slot
+            t->length = 0;
 
             // de-init SPI
             spi_slave_free( VSPI_HOST );
@@ -313,29 +337,4 @@ void spi_slave_task(void *pvParameters)
             break;
         }
     }
-}
-
-void spi_slave_send( MessageBuffer_t* message )
-{
-    // TODO needs to be adapted to multi-buffer-queue
-    // // clear receive-buffer
-    // memset( recvbuf, 0, SPI_SLAVE_BUFFER_SIZE );
-
-    // // allocate transaction object
-    // spi_slave_transaction_t* t = &transactions[0];
-    
-    // t->length = SPI_SLAVE_BUFFER_SIZE * 8;
-
-    // // copy data to send-buffer
-    // int totalMessageLength = message->MessageSize + 2;
-    // sendbuf[ 0 ] = totalMessageLength;
-    // sendbuf[ 1 ] = message->MessagePort;
-    // memcpy( &sendbuf[ 2 ], message->Message, message->MessageSize );
-    
-    // esp_err_t ret = spi_slave_queue_trans( VSPI_HOST, t, 0 );
-
-    // if( ret != ESP_OK )
-    // {
-    //     ESP_LOGW( "SPIS", "SPI Slave device queue was not empty", ret );
-    // }
 }

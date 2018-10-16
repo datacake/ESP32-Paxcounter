@@ -37,9 +37,8 @@ public:
   void addConfig(configData_t value);
   void addStatus(uint16_t voltage, uint64_t uptime, float cputemp, uint32_t mem);
   void addAlarm(int8_t rssi, uint8_t message);
-#ifdef HAS_GPS
   void addGPS(gpsStatus_t value);
-#endif
+  void addUint16(uint16_t value);
 #ifdef HAS_BUTTON
   void addButton(uint8_t value);
 #endif

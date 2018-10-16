@@ -7,7 +7,7 @@
 // attn: increment version after modifications to configData_t truct!
 #define PROGVERSION "1.4.23" // use max 10 chars here!
 #define PROGNAME "PAXCNT"
-#define BUILD_NUMBER    1
+#define BUILD_NUMBER    2
 
 #define ROLE_STANDALONE 0
 #define ROLE_PARENT     1
@@ -87,8 +87,10 @@ extern std::list<PacketEvent*> packets;
 extern portMUX_TYPE packetListMutex;
 #elif (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
 extern std::list<FoundDevice> macs; // temp storage for MACs
+extern uint16_t wifi_new, wifi_lastSend, wifi_last10mins, wifi_last20mins, wifi_last30mins;
 extern uint16_t macs_total, macs_wifi, macs_ble;
 #endif
+extern uint32_t last_sendTime_ms;
 extern configData_t cfg;                      // current device configuration
 extern char display_line6[], display_line7[]; // screen buffers
 extern uint8_t channel;                       // wifi channel rotation counter
@@ -102,9 +104,7 @@ extern QueueHandle_t LoraSendQueue, SPISendQueue;
 extern std::array<uint64_t, 0xff>::iterator it;
 extern std::array<uint64_t, 0xff> beacons;
 
-#ifdef HAS_GPS
 #include "gps.h"
-#endif
 
 #ifdef HAS_LED
 #include "led.h"

@@ -69,8 +69,84 @@ void sendPayload() {
     } else {
       ESP_LOGD(TAG, "No valid GPS position or GPS data mode disabled");
     }
+#else
+    // Add empty GPS data
+    gpsStatus_t gpsStatus = 
+    {
+      .latitude = 0,
+      .longitude = 0,
+      .satellites = 0,
+      .hdop = 0,
+      .altitude = 0
+    };
+    payload.addGPS( gpsStatus );
 #endif
+
+    // Process statistics in macs database
+    wifi_new = wifi_last10mins = wifi_last20mins = wifi_last30mins = 0;
+    int uptime_ms = esp_timer_get_time() / 1000;
+    for( auto iter = macs.begin(); iter != macs.end(); iter++ )
+    {
+      FoundDevice* dev = &*iter;
+
+      uint32_t age_ms = (uptime_ms - dev->last_timestamp);
+
+      if( dev->last_channel > 0 )
+      {
+        if( age_ms <= 10 *60*1000 )
+        {
+          wifi_last10mins++;
+        }
+        if( age_ms <= 20 *60*1000 )
+        {
+          wifi_last20mins++;
+        }
+        if( age_ms <= 30 *60*1000 )
+        {
+          wifi_last30mins++;
+        }
+      }
+    }
+    // how many new?
+    wifi_new = macs_wifi - wifi_lastSend;
+    wifi_lastSend = macs_wifi;
+
+    // Add statistics to queue (after GPS data)
+    payload.addUint16( wifi_new );
+    payload.addUint16( wifi_last10mins );
+    payload.addUint16( wifi_last20mins );
+    payload.addUint16( wifi_last30mins );
+    payload.addUint16( 0xAA55 );
+
+    // Add to Send queue
     SendData(COUNTERPORT);
+
+    last_sendTime_ms = esp_timer_get_time() / 1000;
+
+    // Debug Print
+    printf("------------------------------------------------------------------\n");
+    printf("Total WiFi: %hu, BL: %hu, uptime: %.02hu:%.02hu:%.02hu, ram: %u bytes\n",
+      macs_wifi, macs_ble,
+      (uptime_ms / 3600000),
+      (uptime_ms / 60000) % 60,
+      (uptime_ms / 1000) % 60,
+      esp_get_free_heap_size());
+    printf("WiFi new: %hu, < 10 mins: %hu, < 20 mins: %hu, < 30 mins: %hu\n",
+      wifi_new, wifi_last10mins, wifi_last20mins, wifi_last30mins );
+    printf("------------------------------------------------------------------\n");
+    printf("MAC          | CH | RSSI | LAST [sec] | COUNT  \n");
+
+    for( auto iter = macs.begin(); iter != macs.end(); iter++ )
+    {
+      FoundDevice* dev = &*iter;
+
+      printf( "%012llX | %.2i | %.2i  | %10lu | %i\n",
+          dev->mac,
+          dev->last_channel,
+          dev->last_rssi,
+          (uptime_ms - dev->last_timestamp) / 1000,
+          dev->seen_count);
+    }
   }
 } // sendpayload()
 
@@ -102,36 +178,7 @@ void processSendBuffer() {
 #endif
 
 #if defined(HAS_SPI) && ((DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT))
-  if (xQueueReceive(SPISendQueue, &SendBuffer, (TickType_t)0) == pdTRUE) {
-#  if HAS_SPI_SLAVE
-    spi_slave_send( &SendBuffer );
-#  endif
-    ESP_LOGI(TAG, "%d bytes sent to SPI", SendBuffer.MessageSize);
-
-    int uptime_ms = esp_timer_get_time() / 1000;
-    char tbuf[14];
-    printf("------------------------------------------------------------------\n");
-    printf("Total WiFi: %hu, BL: %hu, uptime: %.02hu:%.02hu:%.02hu, ram: %u bytes\n",
-      macs_wifi, macs_ble,
-      (uptime_ms / 3600000),
-      (uptime_ms / 60000) % 60,
-      (uptime_ms / 1000) % 60,
-      esp_get_free_heap_size());
-    printf("------------------------------------------------------------------\n");
-    printf("MAC          | CH | RSSI | LAST [sec] | COUNT  \n");
-
-    for( auto iter = macs.begin(); iter != macs.end(); iter++ )
-    {
-      FoundDevice* dev = &*iter;
-
-      printf( "%012llX | %.2i | %.2i  | %10lu | %i\n",
-          dev->mac,
-          dev->last_channel,
-          dev->last_rssi,
-          (uptime_ms - dev->last_timestamp) / 1000,
-          dev->seen_count);
-    }
-  }
+  // SPI sending is done in spi_slave.cpp Task now
 #endif
 
 } // processSendBuffer

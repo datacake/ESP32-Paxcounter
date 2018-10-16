@@ -78,6 +78,7 @@ void reset_counters() {
   macs_total = 0; // reset all counters
   macs_wifi = 0;
   macs_ble = 0;
+  wifi_lastSend = 0;
 #endif
 }
 
