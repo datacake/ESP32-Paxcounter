@@ -152,7 +152,10 @@ void set_blescan(uint8_t val[]) {
   cfg.blescan = val[0] ? 1 : 0;
 #if BLECOUNTER
   if (cfg.blescan)
-    start_BLEscan();
+  {
+    // deactivate for now because it causes a kernel panic
+    // start_BLEscan();
+  }
   else {
     #if (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
     macs_ble = 0; // clear BLE counter

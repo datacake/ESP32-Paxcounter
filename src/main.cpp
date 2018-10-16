@@ -33,6 +33,7 @@ uint8_t channel = 0;                       // channel rotation counter
 uint16_t macs_total = 0, macs_wifi = 0, macs_ble = 0,
          batt_voltage = 0; // globals for display
 uint16_t wifi_new = 0, wifi_lastSend = 0, wifi_last10mins = 0, wifi_last20mins = 0, wifi_last30mins = 0;
+uint16_t ble_new = 0, ble_lastSend = 0, ble_last1mins = 0, ble_last2mins = 0, ble_last3mins = 0;
 
 // last time data was added to send queues
 uint32_t last_sendTime_ms;

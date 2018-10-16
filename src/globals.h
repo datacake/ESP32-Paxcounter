@@ -88,6 +88,7 @@ extern portMUX_TYPE packetListMutex;
 #elif (DEVICE_ROLE == ROLE_STANDALONE) || (DEVICE_ROLE == ROLE_PARENT)
 extern std::list<FoundDevice> macs; // temp storage for MACs
 extern uint16_t wifi_new, wifi_lastSend, wifi_last10mins, wifi_last20mins, wifi_last30mins;
+extern uint16_t ble_new, ble_lastSend, ble_last1mins, ble_last2mins, ble_last3mins;
 extern uint16_t macs_total, macs_wifi, macs_ble;
 #endif
 extern uint32_t last_sendTime_ms;

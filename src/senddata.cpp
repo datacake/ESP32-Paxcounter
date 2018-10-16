@@ -84,6 +84,7 @@ void sendPayload() {
 
     // Process statistics in macs database
     wifi_new = wifi_last10mins = wifi_last20mins = wifi_last30mins = 0;
+    ble_new = ble_last1mins = ble_last2mins = ble_last3mins = 0;
     int uptime_ms = esp_timer_get_time() / 1000;
     for( auto iter = macs.begin(); iter != macs.end(); iter++ )
     {
@@ -91,8 +92,25 @@ void sendPayload() {
 
       uint32_t age_ms = (uptime_ms - dev->last_timestamp);
 
-      if( dev->last_channel > 0 )
+      if( dev->last_channel == 0 )
       {
+        // BLE
+        if( age_ms <= 1 *60*1000 )
+        {
+          ble_last1mins++;
+        }
+        if( age_ms <= 2 *60*1000 )
+        {
+          ble_last2mins++;
+        }
+        if( age_ms <= 3 *60*1000 )
+        {
+          ble_last3mins++;
+        }
+      }
+      else
+      {
+        // WiFi
         if( age_ms <= 10 *60*1000 )
         {
           wifi_last10mins++;
@@ -110,13 +128,18 @@ void sendPayload() {
     // how many new?
     wifi_new = macs_wifi - wifi_lastSend;
     wifi_lastSend = macs_wifi;
+    ble_new = macs_ble - ble_lastSend;
+    ble_lastSend = macs_ble;
 
     // Add statistics to queue (after GPS data)
     payload.addUint16( wifi_new );
     payload.addUint16( wifi_last10mins );
     payload.addUint16( wifi_last20mins );
     payload.addUint16( wifi_last30mins );
-    payload.addUint16( 0xAA55 );
+    payload.addUint16( ble_new );
+    payload.addUint16( ble_last1mins );
+    payload.addUint16( ble_last2mins );
+    payload.addUint16( ble_last3mins );
 
     // Add to Send queue
     SendData(COUNTERPORT);
@@ -133,6 +156,8 @@ void sendPayload() {
       esp_get_free_heap_size());
     printf("WiFi new: %hu, < 10 mins: %hu, < 20 mins: %hu, < 30 mins: %hu\n",
       wifi_new, wifi_last10mins, wifi_last20mins, wifi_last30mins );
+    printf("BLE new: %hu, < 1 mins: %hu, < 2 mins: %hu, < 3 mins: %hu\n",
+      ble_new, ble_last1mins, ble_last2mins, ble_last3mins );
     printf("------------------------------------------------------------------\n");
     printf("MAC          | CH | RSSI | LAST [sec] | COUNT  \n");
 
