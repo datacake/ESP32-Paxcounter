@@ -134,6 +134,11 @@ void spi_slave_init(void)
     // assert( gpio_set_pull_mode( PIN_SPI_SLAVE_SCK, GPIO_PULLUP_ONLY ) == ESP_OK);
     assert( gpio_set_pull_mode( PIN_SPI_SLAVE_SS, GPIO_PULLUP_ONLY ) == ESP_OK);
 
+    // make sure pins are passive first
+    gpio_set_direction( PIN_SPI_SLAVE_MOSI, GPIO_MODE_INPUT );
+    gpio_set_direction( PIN_SPI_SLAVE_SCK, GPIO_MODE_INPUT );
+    gpio_set_direction( PIN_SPI_SLAVE_MISO, GPIO_MODE_INPUT );
+
     // Create a semaphore for IRQ / Task sync
     spiProcessSemaphore = xSemaphoreCreateCounting( SPI_QUEUE_SIZE, SPI_QUEUE_SIZE );
     spiInitSemaphore = xSemaphoreCreateCounting( 1, 0 );
@@ -182,9 +187,6 @@ void spi_slave_task(void *pvParameters)
                     // clear
                     recvbuf[0] = 0;
                 }
-
-                // free transfer slot
-                t->length = 0;
 
                 if( t->length == 0 )
                 {
@@ -305,6 +307,9 @@ void spi_slave_task(void *pvParameters)
             // retrieve result
             spi_slave_transaction_t* t;
             spi_slave_get_trans_result( VSPI_HOST, &t, 0 );
+
+            // free transfer slot
+            t->length = 0;
 
             // de-init SPI
             spi_slave_free( VSPI_HOST );
